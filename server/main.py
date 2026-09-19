@@ -13,10 +13,12 @@ import logging
 import os
 import traceback
 
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
+from . import auth
 from .registry import AppSpec, discover
 
 log = logging.getLogger("unifi")
@@ -52,6 +54,64 @@ def _mount_apps() -> None:
             )
 
         log.info("app %-10s %-12s %s", spec.id, spec.status, spec.name)
+
+
+LOGIN_PAGE = os.path.join(SHELL_STATIC, "login.html")
+
+
+@app.middleware("http")
+async def _password_gate(request: Request, call_next):
+    """공개 배포용 비밀번호 게이트 (UNIFI_PASSWORD 가 있을 때만 동작)."""
+    path = request.url.path
+    if (
+        not auth.enabled()
+        or auth.is_public_path(path)
+        or path == "/style.css"  # 로그인 화면이 쓰는 스타일
+        or auth.valid(request.cookies.get(auth.COOKIE_NAME))
+    ):
+        return await call_next(request)
+
+    if path.startswith("/api/"):
+        return JSONResponse({"detail": "로그인이 필요합니다"}, status_code=401)
+    return FileResponse(LOGIN_PAGE, status_code=401, media_type="text/html")
+
+
+class LoginBody(BaseModel):
+    password: str = ""
+
+
+@app.post("/api/_login")
+def login(body: LoginBody, request: Request) -> JSONResponse:
+    if not auth.enabled():
+        return JSONResponse({"ok": True, "note": "비밀번호가 설정되지 않았습니다"})
+
+    client = request.headers.get("cf-connecting-ip") or (request.client.host if request.client else "?")
+    try:
+        ok = auth.check_password(body.password, client)
+    except auth.TooManyAttempts as exc:
+        return JSONResponse({"detail": str(exc), "retry_after": exc.retry_after}, status_code=429)
+
+    if not ok:
+        log.warning("로그인 실패 (%s)", client)
+        return JSONResponse({"detail": "비밀번호가 맞지 않습니다"}, status_code=401)
+
+    res = JSONResponse({"ok": True})
+    res.set_cookie(
+        auth.COOKIE_NAME,
+        auth.issue(),
+        max_age=auth.SESSION_DAYS * 86400,
+        httponly=True,
+        samesite="lax",
+        secure=request.headers.get("x-forwarded-proto", request.url.scheme) == "https",
+    )
+    return res
+
+
+@app.post("/api/_logout")
+def logout() -> JSONResponse:
+    res = JSONResponse({"ok": True})
+    res.delete_cookie(auth.COOKIE_NAME)
+    return res
 
 
 @app.get("/api/_apps")

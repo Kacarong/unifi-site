@@ -7,6 +7,8 @@
 """
 from __future__ import annotations
 
+import hmac
+import os
 import time
 from typing import Any, Optional
 
@@ -212,8 +214,18 @@ def request_grab(body: GrabRequest) -> dict[str, Any]:
 
 # ---------------- 로컬 에이전트 ----------------
 def _check_agent(token: Optional[str]) -> None:
+    """에이전트 엔드포인트는 사이트 비밀번호 게이트를 통과하지 않는다.
+
+    쿠키가 없는 로컬 PC 에이전트를 받아야 하기 때문이다. 그래서 사이트가
+    공개(UNIFI_PASSWORD 설정)로 떠 있으면 에이전트 토큰이 비어 있는 것을
+    허용하면 안 된다 — 누구나 선점 작업을 가로챌 수 있다.
+    """
     expected = store.get_settings().get("agent_token") or ""
-    if expected and token != expected:
+    if not expected:
+        if os.environ.get("UNIFI_PASSWORD", "").strip():
+            raise HTTPException(503, "공개 모드에서는 설정에서 에이전트 토큰을 먼저 지정해야 합니다")
+        return  # 로컬 실행: 같은 LAN 전제
+    if not hmac.compare_digest(token or "", expected):
         raise HTTPException(401, "invalid agent token")
 
 
