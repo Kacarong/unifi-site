@@ -28,6 +28,7 @@ PUBLIC_PATHS = {
     "/ui.js",
     "/style.css",
     "/manifest.webmanifest",
+    "/favicon.ico",
     "/icon.svg",
     "/icon-180.png",
     "/icon-192.png",

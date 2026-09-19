@@ -337,9 +337,58 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 3px rgba(108, 140, 255, 0.18);
 }
 
-input[type="checkbox"] { width: 20px; min-height: 20px; accent-color: var(--accent); }
+/* 체크박스 — 보이는 네모는 22px 이지만 누르는 면적은 44px 을 채운다.
+ * 기본 체크박스는 크기를 키우면 그대로 커져 버려서, 직접 그린다. */
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  display: grid;
+  place-content: center;
+  cursor: pointer;
+  flex: none;
+}
+
+input[type="checkbox"]::before {
+  content: "";
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  border: 1.5px solid var(--line-strong);
+  background: rgba(8, 12, 24, 0.62);
+  transition: background var(--fast) var(--smooth), border-color var(--fast) var(--smooth),
+    transform var(--fast) var(--spring);
+}
+
+input[type="checkbox"]:checked::before {
+  border-color: transparent;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7'/%3E%3C/svg%3E")
+      center / 15px 15px no-repeat,
+    linear-gradient(135deg, var(--accent), var(--accent-2));
+}
+
+input[type="checkbox"]:active::before { transform: scale(0.88); }
+input[type="checkbox"]:focus-visible::before { box-shadow: 0 0 0 3px rgba(108, 140, 255, 0.28); }
 
 label { display: grid; gap: 6px; font-size: 13px; color: var(--sub); }
+
+/* 체크박스를 품은 라벨은 가로로 나란히. 체크박스가 44px 박스라 자체 여백이
+ * 이미 충분하므로 gap 은 주지 않는다. 라벨 전체가 누르는 면적이 된다. */
+label:has(> input[type="checkbox"]) {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  min-height: 44px;
+  color: var(--text);
+  cursor: pointer;
+}
 
 .field-grid {
   display: grid;

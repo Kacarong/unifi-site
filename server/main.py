@@ -113,6 +113,13 @@ def logout() -> JSONResponse:
     return res
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon() -> FileResponse:
+    """브라우저는 <link rel=icon> 이 있어도 /favicon.ico 를 찾는 경우가 있다.
+    없으면 콘솔에 404 가 남으므로 PNG 아이콘으로 응답한다."""
+    return FileResponse(os.path.join(SHELL_STATIC, "icon-180.png"), media_type="image/png")
+
+
 @app.get("/api/_apps")
 def list_apps() -> JSONResponse:
     return JSONResponse([s.to_json() for s in APPS])

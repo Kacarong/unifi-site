@@ -46,6 +46,10 @@ def run() -> None:
     print("2) 열어둬야 하는 경로")
     check("헬스체크는 통과", client.get("/api/_health").status_code, 200)
     check("로그인 화면 스타일 통과", client.get("/style.css").status_code, 200)
+    check("디자인 시스템 통과", client.get("/ui.css").status_code, 200)
+    # 홈 화면 추가(PWA)와 브라우저 기본 아이콘 요청은 로그인 전에도 와야 한다
+    check("매니페스트 통과", client.get("/manifest.webmanifest").status_code, 200)
+    check("favicon 통과", client.get("/favicon.ico").status_code, 200)
 
     print("3) 틀린 비밀번호는 거부")
     check("401", client.post("/api/_login", json={"password": "nope"}).status_code, 401)

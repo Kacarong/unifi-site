@@ -68,5 +68,18 @@
   line-height: 1.8;
 }
 
-.foot a { color: var(--accent); text-decoration: none; }
-.foot a:hover { text-decoration: underline; }
+.foot p { margin: 0; }
+
+.foot-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 4px;
+  padding: 0 14px 0 0;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.foot-link:hover { text-decoration: underline; }
