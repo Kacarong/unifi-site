@@ -80,6 +80,10 @@ def valid(cookie: str | None) -> bool:
 def check_password(candidate: str, client: str) -> bool:
     """비밀번호 확인. 같은 IP에서 연속 실패하면 잠시 막는다."""
     now = time.time()
+    if len(_fails) > 1000:  # 공개 주소라 IP 가 무한정 쌓이지 않게 정리한다
+        for ip, times in list(_fails.items()):
+            if all(now - t >= _FAIL_WINDOW for t in times):
+                del _fails[ip]
     recent = [t for t in _fails.get(client, []) if now - t < _FAIL_WINDOW]
     if len(recent) >= _MAX_FAILS:
         _fails[client] = recent
