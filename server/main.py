@@ -66,7 +66,6 @@ async def _password_gate(request: Request, call_next):
     if (
         not auth.enabled()
         or auth.is_public_path(path)
-        or path == "/style.css"  # 로그인 화면이 쓰는 스타일
         or auth.valid(request.cookies.get(auth.COOKIE_NAME))
     ):
         return await call_next(request)

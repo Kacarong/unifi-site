@@ -2,48 +2,117 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#070b16" />
+<meta name="color-scheme" content="dark" />
 <meta name="robots" content="noindex, nofollow" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="apple-touch-icon" href="/icon-180.png" />
+<link rel="icon" href="/icon.svg" type="image/svg+xml" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <title>unifi</title>
-<link rel="stylesheet" href="/style.css" />
+<link rel="stylesheet" href="/ui.css" />
 <style>
-  .gate { min-height: 100vh; display: grid; place-items: center; }
-  .gate form { width: min(320px, 90vw); display: grid; gap: 12px; }
-  .gate h1 { margin: 0; font-size: 20px; }
-  .gate p { margin: 0; color: var(--muted, #8b93a7); font-size: 13px; }
-  .gate input { padding: 10px 12px; border-radius: 8px; border: 1px solid #2a3145;
-                background: #141926; color: inherit; font: inherit; }
-  .gate button { padding: 10px 12px; border-radius: 8px; border: 0; cursor: pointer;
-                 background: #e0364a; color: #fff; font: inherit; font-weight: 600; }
-  .gate .err { color: #ff8a9a; font-size: 13px; min-height: 18px; }
+  /* 키보드가 올라와도 폼이 가리지 않도록 dvh 기준으로 잡는다 */
+  .gate {
+    min-height: 100dvh;
+    display: grid;
+    place-items: center;
+    padding: calc(24px + var(--safe-t)) 20px calc(24px + var(--safe-b));
+  }
+  .gate form { width: min(340px, 100%); display: grid; gap: 14px; }
+  .mark {
+    width: 64px; height: 64px;
+    margin: 0 auto 4px;
+    animation: float 4.5s var(--smooth) infinite alternate;
+  }
+  @keyframes float {
+    to { transform: translateY(-9px); }
+  }
+  .gate h1 { text-align: center; font-size: 26px; }
+  .gate .lead { text-align: center; font-size: 13.5px; }
+  .gate .err {
+    min-height: 20px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--err);
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity var(--base) var(--smooth), transform var(--base) var(--spring);
+  }
+  .gate .err.show { opacity: 1; transform: none; }
+  /* 틀렸을 때 폼이 고개를 젓는다 */
+  form.shake { animation: shake 420ms var(--smooth); }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    20% { transform: translateX(-8px); }
+    40% { transform: translateX(7px); }
+    60% { transform: translateX(-5px); }
+    80% { transform: translateX(3px); }
+  }
+  .btn.primary[aria-busy="true"] { pointer-events: none; opacity: 0.75; }
 </style>
 </head>
 <body>
 <div class="gate">
-  <form id="f">
-    <h1>⬡ unifi</h1>
-    <p>비공개 사이트입니다. 비밀번호를 입력하세요.</p>
-    <input id="pw" type="password" autocomplete="current-password" autofocus placeholder="비밀번호" />
-    <button type="submit">들어가기</button>
-    <div class="err" id="err"></div>
+  <form id="f" class="panel reveal in" autocomplete="on">
+    <img class="mark" src="/icon.svg" alt="" width="64" height="64" />
+    <h1 class="brand">unifi</h1>
+    <p class="lead muted">비공개 사이트입니다. 비밀번호를 입력하세요.</p>
+    <input id="pw" type="password" autocomplete="current-password" autofocus
+           placeholder="비밀번호" aria-label="비밀번호" />
+    <button class="btn primary" type="submit" id="go">들어가기</button>
+    <div class="err" id="err" role="alert"></div>
   </form>
 </div>
+<script src="/ui.js"></script>
 <script>
-document.getElementById('f').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const err = document.getElementById('err');
-  err.textContent = '';
-  const res = await fetch('/api/_login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ password: document.getElementById('pw').value }),
-  });
-  if (res.ok) { location.replace(location.pathname + location.search); return; }
-  const body = await res.json().catch(() => ({}));
-  err.textContent = res.status === 429
-    ? `시도가 너무 많습니다. ${body.retry_after || 60}초 뒤 다시 시도하세요.`
-    : '비밀번호가 맞지 않습니다.';
+const form = document.getElementById('f');
+const errBox = document.getElementById('err');
+const btn = document.getElementById('go');
+
+function fail(msg) {
+  errBox.textContent = msg;
+  errBox.classList.add('show');
+  form.classList.remove('shake');
+  void form.offsetWidth;          // 애니메이션 재생을 위해 리플로우를 강제한다
+  form.classList.add('shake');
+  navigator.vibrate?.([12, 60, 12]);
   document.getElementById('pw').select();
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  errBox.classList.remove('show');
+  btn.setAttribute('aria-busy', 'true');
+  btn.textContent = '확인 중…';
+
+  let res;
+  try {
+    res = await fetch('/api/_login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: document.getElementById('pw').value }),
+    });
+  } catch {
+    btn.removeAttribute('aria-busy');
+    btn.textContent = '들어가기';
+    return fail('서버에 연결하지 못했습니다.');
+  }
+
+  if (res.ok) {
+    btn.textContent = '들어가는 중…';
+    location.replace(location.pathname + location.search);
+    return;
+  }
+
+  btn.removeAttribute('aria-busy');
+  btn.textContent = '들어가기';
+  const body = await res.json().catch(() => ({}));
+  fail(res.status === 429
+    ? `시도가 너무 많습니다. ${body.retry_after || 60}초 뒤 다시 시도하세요.`
+    : '비밀번호가 맞지 않습니다.');
 });
 </script>
 </body>

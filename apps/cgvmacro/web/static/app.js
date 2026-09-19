@@ -71,21 +71,21 @@ function targetItem(t) {
   right.style.marginTop = '0';
   if (t.auto_grab) right.append(el('span', 'tag auto', '자동 선점'));
 
-  const toggle = el('button', 'small', t.enabled ? '끄기' : '켜기');
+  const toggle = el('button', 'btn small', t.enabled ? '끄기' : '켜기');
   toggle.onclick = async () => {
     await api(`/targets/${t.id}`, { method: 'PATCH', ...jsonBody({ enabled: !t.enabled }) });
     refreshTargets();
   };
   right.append(toggle);
 
-  const grab = el('button', 'small', '지금 선점');
+  const grab = el('button', 'btn small', '지금 선점');
   grab.onclick = async () => {
     await api('/jobs', { method: 'POST', ...jsonBody({ target_id: t.id, showtime: {} }) });
     refreshJobs();
   };
   right.append(grab);
 
-  const del = el('button', 'small', '삭제');
+  const del = el('button', 'btn small', '삭제');
   del.onclick = async () => {
     if (!confirm(`'${t.name}' 을(를) 삭제할까요?`)) return;
     await api(`/targets/${t.id}`, { method: 'DELETE' });

@@ -19,8 +19,20 @@ from .paths import BASE
 COOKIE_NAME = "unifi_auth"
 SESSION_DAYS = 30
 
-# 공개로 둬야 하는 경로 (로그인 화면 자체와 상태 확인)
-PUBLIC_PATHS = {"/api/_login", "/api/_health"}
+# 공개로 둬야 하는 경로 — 로그인 화면이 쓰는 자원, 상태 확인,
+# 그리고 홈 화면 추가(PWA)에 필요한 매니페스트/아이콘. 비밀은 없다.
+PUBLIC_PATHS = {
+    "/api/_login",
+    "/api/_health",
+    "/ui.css",
+    "/ui.js",
+    "/style.css",
+    "/manifest.webmanifest",
+    "/icon.svg",
+    "/icon-180.png",
+    "/icon-192.png",
+    "/icon-512.png",
+}
 # 로컬 PC 에이전트는 쿠키가 없다. 대신 X-Agent-Token 으로 인증한다
 # (공개 모드에서는 해당 토큰 설정이 필수 — apps/cgvmacro/api.py 참고).
 PUBLIC_PREFIXES = ("/api/cgvmacro/agent/",)

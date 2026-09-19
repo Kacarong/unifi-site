@@ -2,33 +2,49 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#070b16" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="apple-touch-icon" href="/icon-180.png" />
     <title>CGV 좌석 감시 · unifi</title>
+    <!-- 통합 셸의 공용 디자인 시스템. 앱은 이 한 줄만 물려받는다 -->
+    <link rel="stylesheet" href="/ui.css" />
     <link rel="stylesheet" href="./style.css" />
-  </head>
+      <!-- JS 가 꺼져 있으면 등장 애니메이션 없이 바로 보여 준다 -->
+    <noscript><style>.reveal { opacity: 1 !important; transform: none !important; }</style></noscript>
+</head>
   <body>
-    <div class="wrap">
+    <header class="topbar">
       <a class="back" href="/">← unifi</a>
-      <h1>🎟️ CGV 좌석 감시</h1>
-      <p class="sub">
-        감시·알림은 서버가 계속 돌립니다. 좌석 선점이 필요한 순간에만 로컬 PC의
-        크롬이 열려 자리를 잡습니다.
-      </p>
+      <span class="spacer"></span>
+      <span class="tiny">CGV 좌석 감시</span>
+    </header>
 
-      <section class="card">
-        <div class="card-head">
+    <div class="wrap stack">
+      <section class="hero reveal">
+        <h1>🎟️ CGV 좌석 감시</h1>
+        <p class="muted">
+          감시·알림은 서버가 계속 돌립니다. 좌석 선점이 필요한 순간에만 로컬 PC의
+          크롬이 열려 자리를 잡습니다.
+        </p>
+      </section>
+
+      <section class="panel reveal">
+        <div class="row">
           <h2>감시 상태</h2>
           <div class="btns">
-            <button id="startBtn" class="primary">감시 시작</button>
-            <button id="stopBtn">중지</button>
+            <button id="startBtn" class="btn primary">감시 시작</button>
+            <button id="stopBtn" class="btn">중지</button>
           </div>
         </div>
         <div id="status" class="status">불러오는 중…</div>
       </section>
 
-      <section class="card">
+      <section class="panel reveal">
         <h2>감시 대상 추가</h2>
-        <div class="form">
+        <div class="form field-grid">
           <label>별칭<input id="f_name" type="text" placeholder="오디세이 센텀시티" /></label>
           <label>영화<input id="f_movie" type="text" list="movieList" placeholder="영화명 일부" /></label>
           <label>극장<input id="f_theater" type="text" list="theaterList" placeholder="센텀시티" /></label>
@@ -50,23 +66,23 @@
         <datalist id="movieList"></datalist>
         <datalist id="theaterList"></datalist>
         <div class="btns">
-          <button id="previewBtn">회차 미리보기</button>
-          <button id="addBtn" class="primary">대상 추가</button>
+          <button id="previewBtn" class="btn">회차 미리보기</button>
+          <button id="addBtn" class="btn primary">대상 추가</button>
         </div>
         <div id="preview" class="preview hidden"></div>
       </section>
 
-      <section class="card">
+      <section class="panel reveal">
         <h2>감시 대상</h2>
         <div id="targets" class="list">아직 없습니다.</div>
       </section>
 
-      <section class="card">
+      <section class="panel reveal">
         <h2>최근 감지</h2>
         <div id="events" class="list">아직 없습니다.</div>
       </section>
 
-      <section class="card">
+      <section class="panel reveal">
         <h2>선점 작업 (로컬 PC)</h2>
         <div id="jobs" class="list">아직 없습니다.</div>
         <p class="hint">
@@ -75,19 +91,20 @@
         </p>
       </section>
 
-      <section class="card">
+      <section class="panel reveal">
         <h2>알림 설정</h2>
-        <div class="form">
+        <div class="form field-grid">
           <label>디스코드 Webhook URL<input id="s_webhook" type="text" placeholder="https://discord.com/api/webhooks/…" /></label>
           <label>멘션<input id="s_mention" type="text" placeholder="<@사용자ID> 또는 @everyone" /></label>
           <label>폴링 주기(초)<input id="s_interval" type="number" min="10" value="45" /></label>
           <label>지터(초)<input id="s_jitter" type="number" min="0" value="15" /></label>
-          <label>에이전트 토큰<input id="s_token" type="text" placeholder="비우면 인증 없음" /></label>
+          <label>에이전트 토큰<input id="s_token" type="text" placeholder="공개 사이트에서는 필수" /></label>
         </div>
-        <div class="btns"><button id="saveSettings" class="primary">설정 저장</button></div>
+        <div class="btns"><button id="saveSettings" class="btn primary">설정 저장</button></div>
       </section>
     </div>
 
+    <script src="/ui.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>

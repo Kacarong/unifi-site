@@ -2,28 +2,51 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover 가 있어야 아이폰 노치 영역까지 배경이 찬다 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#070b16" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="description" content="개인 프로젝트를 한곳에 모은 통합 사이트" />
+
+    <!-- 홈 화면에 추가했을 때 주소창 없이 앱처럼 뜨게 한다 -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="unifi" />
+    <link rel="apple-touch-icon" href="/icon-180.png" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+
     <title>unifi · 통합 사이트</title>
+    <link rel="stylesheet" href="/ui.css" />
     <link rel="stylesheet" href="/style.css" />
-  </head>
+      <!-- JS 가 꺼져 있으면 등장 애니메이션 없이 바로 보여 준다 -->
+    <noscript><style>.reveal { opacity: 1 !important; transform: none !important; }</style></noscript>
+</head>
   <body>
     <header class="topbar">
       <span class="brand">⬢ unifi</span>
-      <span class="sub">개인 프로젝트 통합 사이트</span>
+      <span class="tiny hide-narrow">개인 프로젝트 통합 사이트</span>
+      <span class="spacer"></span>
+      <span class="dot" title="서버 정상"></span>
     </header>
 
-    <main>
-      <section id="grid" class="grid">
-        <div class="loading">앱 목록 불러오는 중…</div>
+    <main class="wrap">
+      <section class="hero reveal">
+        <h1>필요한 걸 <em>한곳에서</em></h1>
+        <p class="muted">직접 만든 프로젝트들을 앱처럼 모아 둔 공간입니다.</p>
       </section>
 
-      <footer class="foot">
+      <section id="grid" class="grid"></section>
+
+      <footer class="foot reveal">
         새 앱을 추가하려면 <code>apps/&lt;이름&gt;/app.py</code> 에
         <code>SPEC = AppSpec(...)</code> 만 정의하면 자동으로 여기에 나타납니다.
         (<a href="https://github.com/Kacarong/unifi-site/blob/main/docs/ADDING_AN_APP.md">가이드</a>)
       </footer>
     </main>
 
+    <script src="/ui.js"></script>
     <script src="/app.js"></script>
   </body>
 </html>

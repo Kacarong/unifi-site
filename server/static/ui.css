@@ -1,0 +1,448 @@
+/* unifi 공용 디자인 시스템
+ *
+ * 셸이 `/ui.css` 로 서빙한다. 각 앱은 <link rel="stylesheet" href="/ui.css">
+ * 한 줄만 넣으면 같은 톤·같은 모션·같은 모바일 대응을 그대로 받는다.
+ * 빌드 단계가 없으므로 "폴더 하나 추가하면 끝" 성질이 그대로 유지된다.
+ *
+ * 구성: 1) 토큰  2) 리셋/모바일 기본기  3) 배경  4) 타이포
+ *       5) 컴포넌트  6) 모션  7) 접근성/저사양 대응
+ */
+
+/* ───────────────────────── 1. 토큰 ───────────────────────── */
+:root {
+  --bg: #070b16;
+  --bg-2: #0b1122;
+  --panel: rgba(22, 29, 51, 0.72);
+  --panel-solid: #141b2f;
+  --line: rgba(120, 140, 200, 0.16);
+  --line-strong: rgba(120, 140, 200, 0.32);
+  --text: #e9edfa;
+  --sub: #8b97bb;
+  --dim: #6b7699;
+
+  --accent: #6c8cff;
+  --accent-2: #b06cff;
+  --accent-3: #34d8c8;
+  --ok: #4fd39d;
+  --warn: #f5b95c;
+  --err: #ff6b7f;
+
+  --r-sm: 10px;
+  --r: 16px;
+  --r-lg: 22px;
+  --r-pill: 999px;
+
+  /* 스프링 느낌의 이징. 딱 떨어지는 ease 보다 손맛이 있다 */
+  --spring: cubic-bezier(0.22, 1.2, 0.36, 1);
+  --smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --fast: 140ms;
+  --base: 260ms;
+  --slow: 520ms;
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 28px rgba(0, 0, 0, 0.34);
+  --shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.32), 0 22px 54px rgba(0, 0, 0, 0.46);
+
+  /* iOS 노치 / 홈 인디케이터 */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+}
+
+/* 그라디언트 각도를 애니메이션하려면 타입을 등록해야 한다 */
+@property --hue {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+/* ──────────────── 2. 리셋 + 모바일 기본기 ──────────────── */
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html {
+  -webkit-text-size-adjust: 100%;   /* iOS 가로 전환 시 글자 확대 방지 */
+  -webkit-tap-highlight-color: transparent;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;               /* iOS 주소창 때문에 100vh 는 튄다 */
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui,
+    "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  word-break: keep-all;             /* 한글은 어절 단위로 끊어야 읽힌다 */
+  overflow-wrap: anywhere;
+  overscroll-behavior-y: none;      /* 당겨서 새로고침/바운스 억제 */
+  -webkit-font-smoothing: antialiased;
+  padding-left: var(--safe-l);
+  padding-right: var(--safe-r);
+}
+
+/* 터치 기기에서 300ms 지연 제거 + 길게 눌러 선택되는 것 방지 */
+button, a, input, select, textarea, label, .card, .chip {
+  touch-action: manipulation;
+}
+
+img, svg, canvas { max-width: 100%; height: auto; display: block; }
+
+/* ───────────────────────── 3. 배경 ───────────────────────── */
+/* 아주 느리게 흐르는 오로라. 고정 레이어라 스크롤 성능에 영향이 없다 */
+body::before {
+  content: "";
+  position: fixed;
+  inset: -20%;
+  z-index: -2;
+  background:
+    radial-gradient(42vw 42vw at 18% 12%, rgba(108, 140, 255, 0.28), transparent 62%),
+    radial-gradient(38vw 38vw at 82% 8%, rgba(176, 108, 255, 0.22), transparent 60%),
+    radial-gradient(46vw 46vw at 62% 88%, rgba(52, 216, 200, 0.16), transparent 62%);
+  filter: blur(18px) saturate(125%);
+  animation: aurora 28s var(--smooth) infinite alternate;
+  will-change: transform;
+}
+
+/* 미세한 노이즈 — 그라디언트 띠(banding)를 덮어 준다 */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@keyframes aurora {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  50%  { transform: translate3d(-3%, 2%, 0) scale(1.08); }
+  100% { transform: translate3d(2%, -3%, 0) scale(1.04); }
+}
+
+/* ───────────────────────── 4. 타이포 ───────────────────────── */
+h1, h2, h3 {
+  margin: 0;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+h1 { font-size: clamp(22px, 5.2vw, 30px); font-weight: 750; }
+h2 { font-size: clamp(17px, 4vw, 20px); font-weight: 700; }
+h3 { font-size: clamp(16px, 3.6vw, 18px); font-weight: 680; }
+p  { margin: 0; text-wrap: pretty; }
+
+.muted { color: var(--sub); }
+.tiny  { font-size: 12.5px; color: var(--dim); }
+
+code, kbd, .mono {
+  font-family: "SF Mono", ui-monospace, "JetBrains Mono", Menlo, monospace;
+  font-size: 0.92em;
+  background: rgba(10, 15, 30, 0.7);
+  border: 1px solid var(--line);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+/* 브랜드 — 천천히 도는 그라디언트 텍스트 */
+.brand {
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  background: linear-gradient(var(--hue), var(--accent), var(--accent-3), var(--accent-2), var(--accent));
+  background-size: 260% 260%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: huespin 9s linear infinite;
+}
+
+@keyframes huespin {
+  to { --hue: 360deg; }
+}
+
+/* ─────────────────────── 5. 컴포넌트 ─────────────────────── */
+.wrap {
+  width: min(1080px, 100%);
+  margin-inline: auto;
+  padding: 20px 16px calc(56px + var(--safe-b));
+}
+
+/* 상단 바 — 스크롤해도 붙어 있고 뒤가 비친다 */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: calc(12px + var(--safe-t)) 16px 12px;
+  background: linear-gradient(180deg, rgba(7, 11, 22, 0.88), rgba(7, 11, 22, 0.55));
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  border-bottom: 1px solid var(--line);
+}
+
+/* 뒤로가기 — 글자는 작아도 누르는 면적은 44px 을 채운다 */
+.back {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-left: -8px;
+  padding: 0 8px;
+  color: var(--sub);
+  font-size: 13px;
+  text-decoration: none;
+  border-radius: var(--r-sm);
+  transition: color var(--fast) var(--smooth), background var(--fast) var(--smooth);
+}
+
+.back:active { color: var(--text); background: rgba(255, 255, 255, 0.06); }
+
+/* 유리 패널 */
+.card,
+.panel {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--panel);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  box-shadow: var(--shadow);
+}
+
+.panel { padding: 18px 16px; }
+
+.card {
+  display: block;
+  padding: 18px 16px;
+  color: inherit;
+  text-decoration: none;
+  isolation: isolate;
+  overflow: hidden;
+  transition:
+    transform var(--base) var(--spring),
+    border-color var(--base) var(--smooth),
+    box-shadow var(--base) var(--smooth);
+}
+
+/* 카드 위 커서를 따라다니는 빛. --mx/--my 는 ui.js 가 넣는다 */
+.card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  background: radial-gradient(
+    260px circle at var(--mx, 50%) var(--my, 0%),
+    rgba(108, 140, 255, 0.22),
+    transparent 62%
+  );
+  opacity: 0;
+  transition: opacity var(--base) var(--smooth);
+}
+
+/* 손가락에는 hover 가 없다. 포인터가 있는 기기에서만 hover 를 쓴다 */
+@media (hover: hover) and (pointer: fine) {
+  .card:hover {
+    transform: translateY(-4px);
+    border-color: var(--line-strong);
+    box-shadow: var(--shadow-lift);
+  }
+  .card:hover::before { opacity: 1; }
+}
+
+/* 터치에서는 누르는 순간의 반응이 전부다 */
+.card:active { transform: scale(0.982); }
+.card.disabled { opacity: 0.5; pointer-events: none; }
+
+.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 268px), 1fr));
+}
+.stack { display: grid; gap: 14px; }
+
+/* 버튼 — 최소 44px 로 터치 타깃을 확보한다 */
+.btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: transform var(--fast) var(--spring), background var(--fast) var(--smooth);
+}
+
+.btn:active { transform: scale(0.955); }
+.btn:disabled { opacity: 0.45; pointer-events: none; }
+
+.btn.primary {
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 6px 20px rgba(108, 140, 255, 0.35);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover { background: rgba(255, 255, 255, 0.1); }
+  .btn.primary:hover { filter: brightness(1.08); }
+}
+
+/* 누른 자리에서 번지는 물결 (ui.js 가 좌표를 심는다) */
+.btn .ripple {
+  position: absolute;
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  background: rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+  animation: ripple 560ms var(--smooth) forwards;
+}
+
+@keyframes ripple {
+  to { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+}
+
+/* 입력 — font-size 16px 미만이면 iOS 가 포커스 때 화면을 확대한다 */
+input, select, textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: rgba(8, 12, 24, 0.62);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  transition: border-color var(--fast) var(--smooth), box-shadow var(--fast) var(--smooth);
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(108, 140, 255, 0.18);
+}
+
+input[type="checkbox"] { width: 20px; min-height: 20px; accent-color: var(--accent); }
+
+label { display: grid; gap: 6px; font-size: 13px; color: var(--sub); }
+
+.field-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+}
+
+/* 배지 / 칩 */
+.badge, .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  color: var(--sub);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.badge.ready { color: var(--ok); border-color: rgba(79, 211, 157, 0.38); }
+.badge.needs_build { color: var(--warn); border-color: rgba(245, 185, 92, 0.38); }
+.badge.error { color: var(--err); border-color: rgba(255, 107, 127, 0.38); }
+
+/* 상태 점 — 살아 있다는 신호 */
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 0 0 rgba(79, 211, 157, 0.6);
+  animation: pulse 2.2s var(--smooth) infinite;
+}
+
+@keyframes pulse {
+  70%  { box-shadow: 0 0 0 9px rgba(79, 211, 157, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(79, 211, 157, 0); }
+}
+
+/* 스켈레톤 — 로딩 중 빈 화면 대신 형태를 먼저 보여 준다 */
+.skeleton {
+  border-radius: var(--r);
+  background: linear-gradient(100deg, rgba(255,255,255,0.04) 30%,
+              rgba(255,255,255,0.10) 50%, rgba(255,255,255,0.04) 70%);
+  background-size: 220% 100%;
+  animation: shimmer 1.25s linear infinite;
+}
+
+@keyframes shimmer {
+  to { background-position: -220% 0; }
+}
+
+/* ───────────────────────── 6. 모션 ───────────────────────── */
+/* 처음 붙을 때 떠오르는 등장. @starting-style 이 없으면 그냥 즉시 보인다 */
+@starting-style {
+  .card, .panel { opacity: 0; transform: translateY(14px); }
+}
+
+/* 스크롤에 맞춰 드러나기. ui.js 가 .in 을 붙인다 */
+.reveal {
+  opacity: 0;
+  transform: translateY(18px) scale(0.985);
+  transition:
+    opacity var(--slow) var(--smooth),
+    transform var(--slow) var(--spring);
+  transition-delay: var(--d, 0ms);
+}
+
+.reveal.in { opacity: 1; transform: none; }
+
+/* 페이지 전환 — 지원하는 브라우저에서만 켜진다 */
+@view-transition { navigation: auto; }
+
+::view-transition-old(root) { animation: fade-out 180ms var(--smooth) both; }
+::view-transition-new(root) { animation: rise-in 320ms var(--spring) both; }
+
+@keyframes fade-out { to { opacity: 0; } }
+@keyframes rise-in { from { opacity: 0; transform: translateY(10px); } }
+
+/* ─────────────── 7. 접근성 / 저사양 대응 ─────────────── */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* 모션을 꺼 달라고 한 사용자에게는 전부 끈다 (iOS 손쉬운 사용 포함) */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal { opacity: 1; transform: none; }
+  body::before { animation: none; }
+}
+
+/* 배경 블러는 저사양 기기에서 비싸다. 좁은 화면에선 약하게 */
+@media (max-width: 520px) {
+  .card, .panel {
+    backdrop-filter: blur(9px);
+    -webkit-backdrop-filter: blur(9px);
+  }
+  body::before { filter: blur(26px) saturate(115%); }
+}
