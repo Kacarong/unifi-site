@@ -1,0 +1,17 @@
+{
+  "name": "지오글로브 · 지리 학습 지구본",
+  "short_name": "지오글로브",
+  "description": "실제 지형 3D 지구본 위에서 국경·도시·해협·판 경계 등 레이어를 켜고 끄며 지리를 공부하고 퀴즈를 푸는 앱",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b1020",
+  "theme_color": "#0b1020",
+  "lang": "ko",
+  "icons": [
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

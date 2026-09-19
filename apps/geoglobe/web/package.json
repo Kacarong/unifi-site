@@ -1,0 +1,18 @@
+{
+  "name": "geo-globe",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host"
+  },
+  "dependencies": {
+    "cesium": "^1.121.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0",
+    "vite-plugin-cesium": "^1.2.23"
+  }
+}

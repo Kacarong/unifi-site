@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#0b1020" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="지오글로브" />
+    <link rel="icon" type="image/png" href="./icons/icon-192.png" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+    <title>지오글로브 · 지리 학습 지구본</title>
+  </head>
+  <body>
+    <div id="cesiumContainer"></div>
+
+    <!-- 상단 바 -->
+    <header id="topbar">
+      <div class="topbar-left">
+        <a href="/" class="icon-btn" id="backToPortal" aria-label="통합 사이트로">←</a>
+        <button id="menuToggle" class="icon-btn" aria-label="레이어 메뉴">☰</button>
+      </div>
+      <span id="title">🌍 지오글로브</span>
+      <button id="quizToggle" class="icon-btn" aria-label="퀴즈">🎯</button>
+    </header>
+
+    <!-- 검색 바 -->
+    <div id="searchBar">
+      <input id="searchInput" type="search" placeholder="국가·도시·해협·지형 검색…" autocomplete="off" />
+      <button id="searchClear" class="icon-btn" aria-label="지우기">✕</button>
+      <div id="searchResults" class="hidden"></div>
+    </div>
+
+    <!-- 레이어 패널 -->
+    <aside id="panel" class="hidden">
+      <h2>레이어</h2>
+      <div id="layerList"></div>
+      <div class="panel-section">
+        <label class="row">
+          <span>라벨(이름) 표시</span>
+          <input type="checkbox" id="labelToggle" checked />
+        </label>
+      </div>
+      <p class="hint">체크박스로 각 레이어를 켜고 끌 수 있어요.</p>
+    </aside>
+
+    <!-- 퀴즈 패널 -->
+    <aside id="quizPanel" class="hidden">
+      <h2>🎯 퀴즈</h2>
+      <div id="quizSetup">
+        <p>지도에서 강조된 나라의 이름을 맞혀보세요.</p>
+        <label class="row"><span>문제 수</span>
+          <select id="quizCount">
+            <option>5</option><option selected>10</option><option>20</option>
+          </select>
+        </label>
+        <button id="quizStart" class="primary">시작</button>
+      </div>
+      <div id="quizPlay" class="hidden">
+        <div id="quizProgress"></div>
+        <div id="quizQuestion">이 나라는?</div>
+        <div id="quizChoices"></div>
+        <div id="quizFeedback"></div>
+        <button id="quizNext" class="primary hidden">다음</button>
+      </div>
+      <div id="quizResult" class="hidden">
+        <h3>결과</h3>
+        <div id="quizScore"></div>
+        <button id="quizRestart" class="primary">다시 하기</button>
+      </div>
+    </aside>
+
+    <div id="loading">지구본 불러오는 중…</div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

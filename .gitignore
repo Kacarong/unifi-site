@@ -1,0 +1,19 @@
+# 파이썬
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 노드 / 프론트 빌드 산출물
+node_modules/
+dist/
+*.log
+
+# 런타임 데이터 (작업 결과, 감시 상태 등) — 레포 루트의 data/ 만.
+# 앱 안의 정적 데이터(apps/geoglobe/web/public/data 등)는 커밋해야 한다.
+/data/
+
+# 에디터 / OS
+.vscode/
+.idea/
+.DS_Store

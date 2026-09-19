@@ -1,0 +1,24 @@
+{
+  "type": "FeatureCollection",
+  "name": "major_straits_and_canals",
+  "features": [
+    { "type": "Feature", "properties": { "name": "수에즈 운하", "name_en": "Suez Canal", "kind": "canal" }, "geometry": { "type": "Point", "coordinates": [32.35, 30.6] } },
+    { "type": "Feature", "properties": { "name": "파나마 운하", "name_en": "Panama Canal", "kind": "canal" }, "geometry": { "type": "Point", "coordinates": [-79.68, 9.12] } },
+    { "type": "Feature", "properties": { "name": "말라카 해협", "name_en": "Strait of Malacca", "kind": "strait" }, "geometry": { "type": "Point", "coordinates": [100.4, 2.5] } },
+    { "type": "Feature", "properties": { "name": "호르무즈 해협", "name_en": "Strait of Hormuz", "kind": "strait" }, "geometry": { "type": "Point", "coordinates": [56.3, 26.6] } },
+    { "type": "Feature", "properties": { "name": "지브롤터 해협", "name_en": "Strait of Gibraltar", "kind": "strait" }, "geometry": { "type": "Point", "coordinates": [-5.6, 35.95] } },
+    { "type": "Feature", "properties": { "name": "보스포루스 해협", "name_en": "Bosporus", "kind": "strait" }, "geometry": { "type": "Point", "coordinates": [29.03, 41.1] } },
+    { "type": "Feature", "properties": { "name": "다르다넬스 해협", "name_en": "Dardanelles", "kind": "strait" }, "geometry": { "type": "Point", "coordinates": [26.4, 40.2] } },
+    { "type": "Feature", "properties": { "name": "바브엘만데브 해협", "name_en": "Bab-el-Mandeb", "kind": "strait" }, "geometry": { "type": "Point", "coordinates": [43.35, 12.6] } },
+    { "type": "Feature", "properties": { "name": "도버 해협", "name_en": "Strait of Dover", "kind": "strait" }, "geometry": { "type": "Point", "coordinates": [1.5, 51.0] } },
+    { "type": "Feature", "properties": { "name": "베링 해협", "name_en": "Bering Strait", "kind": "strait" }, "geometry": { "type": "Point", "coordinates": [-169.0, 65.7] } },
+    { "type": "Feature", "properties": { "name": "마젤란 해협", "name_en": "Strait of Magellan", "kind": "strait" }, "geometry": { "type": "Point", "coordinates": [-70.5, -53.5] } },
+    { "type": "Feature", "properties": { "name": "타이완 해협", "name_en": "Taiwan Strait", "kind": "strait" }, "geometry": { "type": "Point", "coordinates": [119.5, 24.5] } },
+    { "type": "Feature", "properties": { "name": "대한해협", "name_en": "Korea Strait", "kind": "strait" }, "geometry": { "type": "Point", "coordinates": [129.5, 34.4] } },
+    { "type": "Feature", "properties": { "name": "믈라카 남단·순다 해협", "name_en": "Sunda Strait", "kind": "strait" }, "geometry": { "type": "Point", "coordinates": [105.9, -6.0] } },
+    { "type": "Feature", "properties": { "name": "모잠비크 해협", "name_en": "Mozambique Channel", "kind": "strait" }, "geometry": { "type": "Point", "coordinates": [41.0, -18.0] } },
+    { "type": "Feature", "properties": { "name": "드레이크 해협", "name_en": "Drake Passage", "kind": "strait" }, "geometry": { "type": "Point", "coordinates": [-63.0, -58.0] } },
+    { "type": "Feature", "properties": { "name": "영국 해협(도버 서편)", "name_en": "English Channel", "kind": "strait" }, "geometry": { "type": "Point", "coordinates": [-1.5, 50.0] } },
+    { "type": "Feature", "properties": { "name": "홍해 입구·수에즈만", "name_en": "Gulf of Suez", "kind": "strait" }, "geometry": { "type": "Point", "coordinates": [33.0, 28.5] } }
+  ]
+}

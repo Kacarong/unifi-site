@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>unifi · 통합 사이트</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <span class="brand">⬢ unifi</span>
+      <span class="sub">개인 프로젝트 통합 사이트</span>
+    </header>
+
+    <main>
+      <section id="grid" class="grid">
+        <div class="loading">앱 목록 불러오는 중…</div>
+      </section>
+
+      <footer class="foot">
+        새 앱을 추가하려면 <code>apps/&lt;이름&gt;/app.py</code> 에
+        <code>SPEC = AppSpec(...)</code> 만 정의하면 자동으로 여기에 나타납니다.
+        (<a href="https://github.com/Kacarong/unifi-site/blob/main/docs/ADDING_AN_APP.md">가이드</a>)
+      </footer>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

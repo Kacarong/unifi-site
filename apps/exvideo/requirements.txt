@@ -1,0 +1,17 @@
+# ex-video : 강의 영상 → (전사 + 슬라이드 텍스트 + 슬라이드/그림 이미지) 추출기
+# Python 3.10+ 권장
+
+# 영상 프레임 처리 / 이미지
+opencv-python>=4.9
+numpy>=1.24
+Pillow>=10.0
+ImageHash>=4.3
+
+# 구글드라이브 등 링크 다운로드
+gdown>=5.1
+
+# 음성 전사 (로컬, GPU 가속 지원). GPU면 자동으로 CUDA 사용.
+faster-whisper>=1.0
+
+# 슬라이드 OCR (한국어+영어). torch 기반.
+easyocr>=1.7

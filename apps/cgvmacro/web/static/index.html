@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CGV 좌석 감시 · unifi</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <a class="back" href="/">← unifi</a>
+      <h1>🎟️ CGV 좌석 감시</h1>
+      <p class="sub">
+        감시·알림은 서버가 계속 돌립니다. 좌석 선점이 필요한 순간에만 로컬 PC의
+        크롬이 열려 자리를 잡습니다.
+      </p>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>감시 상태</h2>
+          <div class="btns">
+            <button id="startBtn" class="primary">감시 시작</button>
+            <button id="stopBtn">중지</button>
+          </div>
+        </div>
+        <div id="status" class="status">불러오는 중…</div>
+      </section>
+
+      <section class="card">
+        <h2>감시 대상 추가</h2>
+        <div class="form">
+          <label>별칭<input id="f_name" type="text" placeholder="오디세이 센텀시티" /></label>
+          <label>영화<input id="f_movie" type="text" list="movieList" placeholder="영화명 일부" /></label>
+          <label>극장<input id="f_theater" type="text" list="theaterList" placeholder="센텀시티" /></label>
+          <label>날짜<input id="f_date" type="date" /></label>
+          <label>시작 시각<input id="f_from" type="time" /></label>
+          <label>끝 시각<input id="f_to" type="time" /></label>
+          <label>상영 포맷<input id="f_screen" type="text" placeholder="IMAX / 4DX (비우면 전체)" /></label>
+          <label>최소 잔여석<input id="f_min" type="number" min="1" value="1" /></label>
+          <label class="check"><input id="f_auto" type="checkbox" /> 감지되면 로컬 PC로 자동 선점</label>
+          <label>인원 (일반/청소년/우대)
+            <span class="triple">
+              <input id="f_gen" type="number" min="0" value="2" />
+              <input id="f_teen" type="number" min="0" value="0" />
+              <input id="f_senior" type="number" min="0" value="0" />
+            </span>
+          </label>
+          <label>원하는 좌석<input id="f_seats" type="text" placeholder="E9,E10 (비우면 자동)" /></label>
+        </div>
+        <datalist id="movieList"></datalist>
+        <datalist id="theaterList"></datalist>
+        <div class="btns">
+          <button id="previewBtn">회차 미리보기</button>
+          <button id="addBtn" class="primary">대상 추가</button>
+        </div>
+        <div id="preview" class="preview hidden"></div>
+      </section>
+
+      <section class="card">
+        <h2>감시 대상</h2>
+        <div id="targets" class="list">아직 없습니다.</div>
+      </section>
+
+      <section class="card">
+        <h2>최근 감지</h2>
+        <div id="events" class="list">아직 없습니다.</div>
+      </section>
+
+      <section class="card">
+        <h2>선점 작업 (로컬 PC)</h2>
+        <div id="jobs" class="list">아직 없습니다.</div>
+        <p class="hint">
+          로컬 PC에서 <code>python agent/agent.py --server &lt;이 사이트 주소&gt;</code> 를
+          실행해 두면 여기 쌓인 작업을 가져가 크롬으로 좌석을 잡습니다.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>알림 설정</h2>
+        <div class="form">
+          <label>디스코드 Webhook URL<input id="s_webhook" type="text" placeholder="https://discord.com/api/webhooks/…" /></label>
+          <label>멘션<input id="s_mention" type="text" placeholder="<@사용자ID> 또는 @everyone" /></label>
+          <label>폴링 주기(초)<input id="s_interval" type="number" min="10" value="45" /></label>
+          <label>지터(초)<input id="s_jitter" type="number" min="0" value="15" /></label>
+          <label>에이전트 토큰<input id="s_token" type="text" placeholder="비우면 인증 없음" /></label>
+        </div>
+        <div class="btns"><button id="saveSettings" class="primary">설정 저장</button></div>
+      </section>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
