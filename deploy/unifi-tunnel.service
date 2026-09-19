@@ -1,7 +1,9 @@
 [Unit]
 Description=unifi-site 공개 터널 (Cloudflare)
 After=unifi-site.service
-Requires=unifi-site.service
+# Requires= 는 재시작까지 전파돼서 앱을 고칠 때마다 공개 주소가 바뀐다.
+# 터널은 원본이 잠깐 죽어도 다시 붙으므로 Wants 로 느슨하게 묶는다.
+Wants=unifi-site.service
 
 [Service]
 Type=simple
