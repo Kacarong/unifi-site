@@ -42,6 +42,44 @@ python scripts/build.py geoglobe                          # 지구본 프론트 
 **의존성을 설치하지 않아도 서버는 뜬다.** 해당 앱만 포털에서 `오류`/`빌드 필요` 로
 표시되고 나머지는 정상 동작한다.
 
+## 공개 배포
+
+`UNIFI_PASSWORD` 를 설정하면 사이트 전체에 비밀번호 게이트가 걸린다. 비워 두면
+게이트가 아예 꺼지므로 **로컬에서만** 비워 둔다.
+
+```bash
+# /home/claude/.config/unifi-site/env  (chmod 600)
+UNIFI_PASSWORD=<긴 랜덤 문자열>
+UNIFI_DATA_DIR=/home/claude/unifi-site/data
+UNIFI_PORT=8090
+```
+
+`deploy/` 에 systemd 유저 유닛 두 개가 있다. 서비스는 루프백에만 바인딩하고,
+바깥 노출은 터널이 담당한다.
+
+```bash
+cp deploy/unifi-site.service deploy/unifi-tunnel.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now unifi-site.service unifi-tunnel.service
+cat ~/.config/unifi-site/public-url        # 현재 공개 주소
+```
+
+공개 모드에서는 로컬 PC 에이전트용 **에이전트 토큰이 필수**다. 에이전트 엔드포인트는
+쿠키가 없어 비밀번호 게이트를 지나가므로, 토큰이 비어 있으면 서버가 503 으로 거절한다.
+웹의 "알림 설정 → 에이전트 토큰" 에 값을 넣고 에이전트에도 같은 값을 준다.
+
+### 고정 도메인
+
+`deploy/tunnel.sh` 가 쓰는 Cloudflare quick tunnel 은 주소가 재시작마다 바뀐다.
+주소를 고정하려면 둘 중 하나로 바꾼다.
+
+- **Cloudflare named tunnel** — 도메인 DNS 를 Cloudflare 로 옮긴 뒤
+  `cloudflared tunnel create unifi` + `cloudflared tunnel route dns unifi unifi.<도메인>`.
+  Cloudflare Access 를 얹으면 비밀번호 대신 구글 로그인으로 바꿀 수도 있다.
+- **기존 리버스 프록시에 추가** — 이미 TLS 를 끝내는 프록시가 있으면
+  `unifi.<도메인>` A 레코드를 추가하고 `→ <이 서버>:8090` 으로 프록시한다.
+  이때 `X-Forwarded-Proto: https` 를 넘겨야 세션 쿠키에 Secure 가 붙는다.
+
 ## 구조
 
 ```

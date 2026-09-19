@@ -1,0 +1,14 @@
+[Unit]
+Description=unifi-site 공개 터널 (Cloudflare)
+After=unifi-site.service
+Requires=unifi-site.service
+
+[Service]
+Type=simple
+EnvironmentFile=/home/claude/.config/unifi-site/env
+ExecStart=/home/claude/unifi-site/deploy/tunnel.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

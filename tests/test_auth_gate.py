@@ -40,7 +40,7 @@ def run() -> None:
 
     print("1) 로그인 전에는 막힌다")
     check("포털은 로그인 화면", client.get("/").status_code, 401)
-    check("앱 API 401", client.get("/api/cgvmacro/status").status_code, 401)
+    check("앱 API 401", client.get("/api/cgvmacro/monitor/status").status_code, 401)
     check("앱 목록 401", client.get("/api/_apps").status_code, 401)
 
     print("2) 열어둬야 하는 경로")

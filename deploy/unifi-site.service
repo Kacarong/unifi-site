@@ -1,0 +1,20 @@
+[Unit]
+Description=unifi-site (개인 프로젝트 통합 사이트)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/claude/unifi-site
+EnvironmentFile=/home/claude/.config/unifi-site/env
+Environment=TMPDIR=/home/claude/.tmp
+Environment=PIP_CACHE_DIR=/home/claude/.cache/pip
+ExecStart=/home/claude/unifi-site/.venv/bin/python -m uvicorn server.main:app \
+    --host 127.0.0.1 --port 8090 \
+    --proxy-headers --forwarded-allow-ips='*'
+Restart=always
+RestartSec=5
+MemoryHigh=8G
+
+[Install]
+WantedBy=default.target
