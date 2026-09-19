@@ -52,15 +52,23 @@ def _in_range(s: Showtime, time_from: str, time_to: str) -> bool:
 
 
 def _kinds_for(is_new: bool, prev: str, cur: str, alerts: dict[str, Any]) -> list[str]:
-    kinds: list[str] = []
-    if is_new and alerts.get("on_showtime_open", True):
-        kinds.append("open")
+    """회차 하나의 상태 변화는 알림 1건으로만 낸다.
+
+    처음 나타난 회차는 '상영 오픈'이 이미 잔여석 상황까지 설명하므로,
+    여기에 '잔여석' 이벤트를 겹쳐 내면 신규 회차마다 알림이 두 번 간다.
+    """
+    if is_new:
+        return ["open"] if alerts.get("on_showtime_open", True) else []
     if cur == "available":
         if prev == "soldout" and alerts.get("on_soldout_to_available", True):
-            kinds.append("cancel")
-        elif prev != "available" and alerts.get("on_seats_available", True):
-            kinds.append("available")
-    return kinds
+            return ["cancel"]
+        if prev != "available" and alerts.get("on_seats_available", True):
+            return ["available"]
+    return []
+
+
+# 자동 선점을 촉발하는 상태 이벤트 (stage_event 같은 부가 알림은 제외)
+GRAB_KINDS = ("cancel", "available", "open")
 
 
 class Watcher:
@@ -173,7 +181,7 @@ class Watcher:
             for kind in kinds:
                 self._emit(target, s, kind, mov_nm, site_nm, notifier)
 
-            if target.get("auto_grab") and cur == "available" and ("cancel" in kinds or "available" in kinds):
+            if target.get("auto_grab") and cur == "available" and any(k in kinds for k in GRAB_KINDS):
                 self._queue_grab(target, s)
 
         store.set_seen(target["id"], next_seen)

@@ -101,11 +101,12 @@ def run() -> None:
     check("선점 작업 그대로 1건", len(store.list_jobs()), 1)
     check("이벤트 그대로 1건", len(store.list_events()), 1)
 
-    print("5) 새 회차가 열리면 '상영 오픈'")
+    print("5) 새 회차가 열리면 '상영 오픈' 한 건만 (잔여석 알림과 겹치지 않는다)")
     fake.showtimes.append(showtime("16:00", 80))
     watcher._poll_target(store.get_target(target["id"]), None)
     kinds = [e["kind"] for e in store.list_events() if e["time"] == "16:00"]
-    check("오픈 알림 발생", "open" in kinds, True)
+    check("오픈 알림 1건", kinds, ["open"])
+    check("신규 회차도 자동 선점", len(store.list_jobs()), 2)
 
     print("6) 대상 조건을 바꾸면 기준선을 다시 잡는다")
     store.update_target(target["id"], {"date": "2026-09-26"})
