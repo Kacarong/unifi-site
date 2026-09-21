@@ -6,6 +6,13 @@ import { Search } from './search.js';
 
 const ctx = { lang: 'ko', showLabels: true };
 
+/* 휴대폰은 화면이 촘촘하고(dpr 3) GPU 는 약하다. 데스크톱 기준 화질을 그대로
+ * 쓰면 그려야 할 픽셀이 몇 배로 늘어 프레임이 무너진다. 기기를 보고 낮춘다. */
+const LOW_POWER =
+  matchMedia('(pointer: coarse)').matches ||
+  Math.min(screen.width, screen.height) <= 820 ||
+  (navigator.hardwareConcurrency || 8) <= 4;
+
 // 선택: Cesium ion 토큰이 있으면 3D 지형 + 위성영상 품질 향상
 const ionToken = import.meta.env.VITE_CESIUM_ION_TOKEN;
 if (ionToken) Cesium.Ion.defaultAccessToken = ionToken;
@@ -29,16 +36,25 @@ async function init() {
     infoBox: false,
     selectionIndicator: false,
     useBrowserRecommendedResolution: false,
+    // 기본 Cesium 은 가만히 있어도 초당 60번 다시 그린다. 지구본은 움직일
+    // 때만 바뀌므로 변화가 있을 때만 그리게 한다. 모바일 발열/배터리와
+    // 프레임에 가장 크게 작용하는 설정이다.
+    requestRenderMode: true,
+    maximumRenderTimeChange: Infinity,
   });
 
-  // 해상도/선명도 향상
-  viewer.resolutionScale = Math.min(window.devicePixelRatio || 1, 2); // 고DPI(레티나/4K)에서 선명하게
-  viewer.scene.globe.maximumScreenSpaceError = 1.5; // 위성 타일 상세도 상향(기본 2 → 1.5)
-  viewer.scene.globe.preloadSiblings = true;
-  if (viewer.scene.postProcessStages.fxaa) viewer.scene.postProcessStages.fxaa.enabled = true;
+  const scene = viewer.scene;
 
-  viewer.scene.globe.showGroundAtmosphere = true;
-  viewer.scene.skyAtmosphere.show = true;
+  // 화질 — 저사양에선 한 단계씩 낮춘다
+  viewer.resolutionScale = LOW_POWER ? 1 : Math.min(window.devicePixelRatio || 1, 2);
+  scene.globe.maximumScreenSpaceError = LOW_POWER ? 3 : 1.5; // 클수록 타일 적게 = 가볍다
+  scene.globe.preloadSiblings = !LOW_POWER;                  // 주변 타일 미리 받기
+  if (scene.postProcessStages.fxaa) scene.postProcessStages.fxaa.enabled = !LOW_POWER;
+
+  // 대기 표현은 예쁘지만 매 프레임 추가 셰이딩이 든다
+  scene.globe.showGroundAtmosphere = !LOW_POWER;
+  scene.skyAtmosphere.show = !LOW_POWER;
+  scene.fog.enabled = !LOW_POWER;
 
   // ion 토큰이 있을 때만 3D 지형 사용
   if (ionToken) {
@@ -62,7 +78,30 @@ async function init() {
 
   window.Cesium = Cesium;
   window.viewer = viewer; // 콘솔에서 카메라 제어/디버깅용
+  installRedrawSafetyNet(viewer);
   document.getElementById('loading').classList.add('hidden');
+  viewer.scene.requestRender();
+}
+
+/* requestRenderMode 를 켜면 카메라 이동·타일 로딩은 Cesium 이 알아서 다시
+ * 그리지만, 코드가 엔티티 색이나 표시 여부를 바꾼 것까지 항상 잡아내지는
+ * 않는다. 그 경우 화면이 멈춘 것처럼 보인다. 사용자가 뭔가 조작하면 잠깐
+ * 다시 그려 주는 안전망을 둬서, 어느 모듈이 무엇을 바꾸든 화면에 반영되게 한다. */
+function installRedrawSafetyNet(viewer) {
+  let until = 0;
+  const pump = () => {
+    viewer.scene.requestRender();
+    if (performance.now() < until) requestAnimationFrame(pump);
+  };
+  const kick = () => {
+    const wasIdle = performance.now() >= until;
+    until = performance.now() + 450;   // 조작 후 0.45초만 계속 갱신
+    if (wasIdle) requestAnimationFrame(pump);
+  };
+  for (const ev of ['pointerdown', 'pointerup', 'change', 'input', 'keydown']) {
+    document.addEventListener(ev, kick, { passive: true });
+  }
+  window.addEventListener('resize', kick, { passive: true });
 }
 
 function buildLayerUI(layers) {
