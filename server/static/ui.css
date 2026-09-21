@@ -399,6 +399,68 @@ label:has(> input[type="checkbox"]) {
   cursor: pointer;
 }
 
+/* ── 자동완성 목록 ────────────────────────────────────────
+ * 브라우저 기본 <datalist> 는 CSS 가 전혀 안 먹어서 사이트 톤과 따로 논다.
+ * ui.js 의 combobox() 가 이 구조를 만들어 같은 동작을 직접 그린다. */
+.combo { position: relative; }
+
+.combo-list {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  /* 실제 최대 높이는 ui.js 가 남은 공간에 맞춰 다시 정한다 */
+  max-height: min(42vh, 320px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;   /* 목록 끝에서 페이지가 같이 밀리지 않게 */
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  background: rgba(16, 22, 40, 0.96);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  box-shadow: var(--shadow-lift);
+  animation: combo-in 160ms var(--spring);
+}
+
+/* 아래 공간이 모자라면 위로 펼친다 */
+.combo.flip .combo-list { top: auto; bottom: calc(100% + 6px); }
+
+@keyframes combo-in {
+  from { opacity: 0; transform: translateY(-6px); }
+}
+
+.combo-item {
+  display: flex;
+  align-items: center;
+  min-height: 44px;               /* 손가락으로 고를 수 있는 크기 */
+  padding: 8px 12px;
+  border-radius: var(--r-sm);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background var(--fast) var(--smooth);
+}
+
+.combo-item.active,
+.combo-item:active { background: rgba(108, 140, 255, 0.22); }
+
+@media (hover: hover) and (pointer: fine) {
+  .combo-item:hover { background: rgba(255, 255, 255, 0.07); }
+}
+
+.combo-empty {
+  padding: 14px 12px;
+  color: var(--dim);
+  font-size: 13px;
+  text-align: center;
+}
+
 .field-grid {
   display: grid;
   gap: 12px;

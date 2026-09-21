@@ -225,19 +225,16 @@ async function preview() {
   }
 }
 
+// 영화·극장 칸은 셸의 공용 자동완성을 쓴다. 브라우저 기본 datalist 는
+// CSS 가 전혀 안 먹어서 사이트 톤과 따로 놀았다.
+const movieBox = window.unifiUI?.combobox($('f_movie'), { emptyText: '그런 영화가 없습니다' });
+const theaterBox = window.unifiUI?.combobox($('f_theater'), { emptyText: '그런 극장이 없습니다' });
+
 async function loadLists() {
   try {
     const [movies, theaters] = await Promise.all([api('/movies'), api('/theaters')]);
-    const fill = (listId, names) => {
-      const list = $(listId);
-      names.forEach((name) => {
-        const opt = el('option');
-        opt.value = name;
-        list.append(opt);
-      });
-    };
-    fill('movieList', movies.map((m) => m.name));
-    fill('theaterList', theaters.map((t) => t.name));
+    movieBox?.setOptions(movies.map((m) => m.name));
+    theaterBox?.setOptions(theaters.map((t) => t.name));
   } catch (e) {
     /* 목록은 없어도 직접 입력하면 된다 */
   }
