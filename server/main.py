@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import traceback
 
 from fastapi import FastAPI, Request
@@ -75,15 +76,29 @@ async def _password_gate(request: Request, call_next):
     return FileResponse(LOGIN_PAGE, status_code=401, media_type="text/html")
 
 
-@app.middleware("http")
-async def _cache_fonts(request: Request, call_next):
-    """글꼴 파일은 내용이 바뀌지 않는다. 한 번 받으면 다시 받지 않게 한다.
+# 파일 이름에 내용 해시가 박힌 빌드 산출물 (예: index-BnQh4cpB.js).
+# 내용이 바뀌면 이름이 바뀌므로 영구 캐시해도 안전하다.
+_HASHED_ASSET = re.compile(r"/assets/[^/]+-[A-Za-z0-9_-]{8,}\.(js|css|woff2?|png|svg)$")
 
-    이게 없으면 방문할 때마다 수십 개 조각을 다시 내려받아 모바일에서 특히 느리다.
+
+@app.middleware("http")
+async def _cache_policy(request: Request, call_next):
+    """캐시 규칙을 명시한다.
+
+    헤더를 아예 안 주면 브라우저가 스스로 '아직 신선하다'고 판단해 서버에
+    묻지도 않고 옛 파일을 쓴다. 그래서 화면을 고쳐도 이미 방문했던 기기에서는
+    한참 동안 그대로 보인다. 실제로 그 현상이 있었다.
+
+    - 글꼴, 해시 붙은 빌드 파일: 내용이 안 바뀌므로 영구 캐시
+    - 나머지(HTML·CSS·JS·데이터): 매번 확인만 시킨다. 안 바뀌었으면 서버가
+      304 로 답하므로 본문은 다시 받지 않아 느려지지 않는다.
     """
     response = await call_next(request)
-    if request.url.path.startswith("/fonts/"):
+    path = request.url.path
+    if path.startswith("/fonts/") or _HASHED_ASSET.search(path):
         response.headers["cache-control"] = "public, max-age=31536000, immutable"
+    else:
+        response.headers.setdefault("cache-control", "no-cache")
     return response
 
 

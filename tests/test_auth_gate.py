@@ -63,6 +63,17 @@ def run() -> None:
     check("포털 열림", client.get("/").status_code, 200)
     check("앱 API 열림", client.get("/api/_apps").status_code, 200)
 
+    print("4-1) 캐시 규칙 — 고친 화면이 옛 파일에 가려지면 안 된다")
+    # 헤더가 없으면 브라우저가 서버에 묻지도 않고 옛 파일을 쓴다(실제로 겪음).
+    for path in ("/", "/style.css", "/ui.css", "/app.js"):
+        check(f"{path} 는 매번 확인", client.get(path).headers.get("cache-control"), "no-cache")
+    # 내용이 바뀌면 이름이 바뀌는 것들만 영구 캐시
+    check(
+        "글꼴은 영구 캐시",
+        client.get("/fonts/PretendardVariable.subset.0.woff2").headers.get("cache-control"),
+        "public, max-age=31536000, immutable",
+    )
+
     print("5) 쿠키 위조는 통하지 않는다")
     forged = TestClient(app, cookies={"unifi_auth": "99999999999.deadbeef"})
     check("위조 쿠키 401", forged.get("/api/_apps").status_code, 401)
