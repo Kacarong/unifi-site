@@ -67,14 +67,21 @@ function card(app) {
   if (note) inner.append(el('div', 'note', note));
 
   wrap.append(inner);
+  wrap.id = `detail-${app.id}`;
   node.append(wrap);
+
+  // 접혀 있을 때는 화면에서 잘려 안 보이지만 스크린리더에는 그대로 읽힌다.
+  // 상태를 aria 에도 반영해서 보이는 것과 읽히는 것을 맞춘다.
+  more.setAttribute('aria-expanded', 'false');
+  more.setAttribute('aria-controls', wrap.id);
+  wrap.setAttribute('aria-hidden', 'true');
 
   more.addEventListener('click', () => {
     const nowOpen = node.classList.toggle('expanded');
     more.setAttribute('aria-expanded', String(nowOpen));
+    wrap.setAttribute('aria-hidden', String(!nowOpen));
     more.firstChild.textContent = nowOpen ? '접기' : '자세히';
   });
-  more.setAttribute('aria-expanded', 'false');
 
   return node;
 }
