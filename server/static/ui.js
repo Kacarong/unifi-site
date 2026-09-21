@@ -198,6 +198,9 @@
 
     input.addEventListener('focus', open);
     input.addEventListener('input', open);
+    // Esc 로 닫거나 항목을 고른 뒤에도 입력칸은 포커스를 유지한다. 그래서
+    // 다시 눌러도 focus 가 안 떠 목록이 안 열렸다. 클릭도 여는 신호로 본다.
+    input.addEventListener('click', () => { if (list.hidden) open(); });
     input.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowDown') { e.preventDefault(); move(1); }
       else if (e.key === 'ArrowUp') { e.preventDefault(); move(-1); }
