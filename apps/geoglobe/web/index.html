@@ -73,7 +73,16 @@
       </div>
     </aside>
 
-    <div id="loading">지구본 불러오는 중…</div>
+    <div id="loading">
+      <div class="load-box">
+        <div class="load-globe" aria-hidden="true">
+          <span class="load-orbit"><span></span></span>
+        </div>
+        <p class="load-text" id="loadText" role="status" aria-live="polite">지구본 준비 중…</p>
+        <div class="load-bar"><div id="loadBar"></div></div>
+        <p class="load-sub" id="loadSub"></p>
+      </div>
+    </div>
 
     <script type="module" src="/src/main.js"></script>
   </body>

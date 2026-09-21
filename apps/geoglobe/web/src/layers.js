@@ -79,9 +79,19 @@ function regionFar(minLabel) {
 }
 
 // ── 개별 레이어 정의 ─────────────────────────────────────────────
-export async function buildLayers(viewer, ctx) {
+// 아래에서 register() 로 등록하는 레이어 개수. 로딩 진행률에 쓴다.
+// 레이어를 늘리거나 줄이면 이 값도 맞춰야 한다(안 맞으면 콘솔에 경고가 뜬다).
+export const LAYER_COUNT = 12;
+
+/** @param onStep 레이어 하나가 준비될 때마다 (지금까지 개수, 이름) 으로 불린다 */
+export async function buildLayers(viewer, ctx, onStep) {
   const layers = [];
-  const register = (obj) => { layers.push(obj); return obj; };
+  const register = (obj) => {
+    layers.push(obj);
+    // 모든 레이어가 이 한 곳을 지나가므로 진행 보고도 여기에만 둔다
+    try { onStep?.(layers.length, obj.label); } catch { /* 보고 실패가 로딩을 막으면 안 된다 */ }
+    return obj;
+  };
 
   // 1) 국경 (국가 경계) — 라벨 지원
   {
@@ -390,5 +400,8 @@ export async function buildLayers(viewer, ctx) {
     }
   }
 
+  if (layers.length !== LAYER_COUNT) {
+    console.warn(`LAYER_COUNT(${LAYER_COUNT}) 와 실제 레이어 수(${layers.length}) 가 다릅니다. 진행률 표시가 어긋납니다.`);
+  }
   return layers;
 }

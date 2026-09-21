@@ -1,6 +1,6 @@
 import * as Cesium from 'cesium';
 import './style.css';
-import { buildLayers } from './layers.js';
+import { buildLayers, LAYER_COUNT } from './layers.js';
 import { Quiz } from './quiz.js';
 import { Search } from './search.js';
 
@@ -17,7 +17,36 @@ const LOW_POWER =
 const ionToken = import.meta.env.VITE_CESIUM_ION_TOKEN;
 if (ionToken) Cesium.Ion.defaultAccessToken = ionToken;
 
+/* 로딩 화면 — 지금 무엇을 하는 중인지와 얼마나 남았는지를 보여 준다.
+ * 화면이 2~3초 비어 있으면 멈춘 것처럼 느껴지기 때문이다. */
+const loading = {
+  box: () => document.getElementById('loading'),
+  say(text, sub = '') {
+    const t = document.getElementById('loadText');
+    const s = document.getElementById('loadSub');
+    if (t) t.textContent = text;
+    if (s) s.textContent = sub;
+  },
+  progress(ratio) {
+    const bar = document.getElementById('loadBar');
+    if (bar) bar.style.width = `${Math.round(Math.min(1, Math.max(0, ratio)) * 100)}%`;
+  },
+  done() {
+    this.progress(1);
+    this.say('준비 완료');
+    // 막대가 끝까지 차는 걸 보여 준 뒤 사라진다
+    setTimeout(() => this.box()?.classList.add('hidden'), 260);
+  },
+  fail(msg) {
+    this.say('불러오지 못했습니다', msg);
+    this.progress(0);
+  },
+};
+
 async function init() {
+  loading.say('지구본 준비 중…', '위성 영상을 불러오고 있어요');
+  loading.progress(0.08);
+
   // 기본 위성영상: Esri World Imagery (토큰 불필요, 무료)
   const viewer = new Cesium.Viewer('cesiumContainer', {
     baseLayer: Cesium.ImageryLayer.fromProviderAsync(
@@ -63,9 +92,14 @@ async function init() {
 
   // 초기 시점: 지구 전체
   viewer.camera.flyHome(0);
+  loading.progress(0.2);
 
-  // 레이어 구성
-  const layers = await buildLayers(viewer, ctx);
+  // 레이어 구성 — 하나씩 준비될 때마다 진행률을 올린다.
+  // 레이어 로딩이 전체 시간의 대부분이라, 0.2~0.95 구간을 여기에 할당한다.
+  const layers = await buildLayers(viewer, ctx, (done, label) => {
+    loading.say('지도 데이터 불러오는 중…', `${label} (${done}/${LAYER_COUNT})`);
+    loading.progress(0.2 + (done / LAYER_COUNT) * 0.75);
+  });
   const byId = Object.fromEntries(layers.map((l) => [l.id, l]));
 
   // 초기 라벨 상태 적용
@@ -79,8 +113,8 @@ async function init() {
   window.Cesium = Cesium;
   window.viewer = viewer; // 콘솔에서 카메라 제어/디버깅용
   installRedrawSafetyNet(viewer);
-  document.getElementById('loading').classList.add('hidden');
   viewer.scene.requestRender();
+  loading.done();
 }
 
 /* requestRenderMode 를 켜면 카메라 이동·타일 로딩은 Cesium 이 알아서 다시
@@ -181,8 +215,8 @@ function setupSearch(viewer, layers, byId) {
 
 init().catch((err) => {
   console.error(err);
-  const el = document.getElementById('loading');
-  el.textContent = '초기화 오류: ' + (err?.message || err);
+  // 실패해도 로딩 화면 구조는 유지해서, 왜 멈췄는지 화면에 남긴다
+  loading.fail(err?.message || String(err));
 });
 
 // PWA 서비스워커 등록. localhost 개발 중에는 캐시가 예전 JS를 붙잡아
