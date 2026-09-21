@@ -12,6 +12,10 @@
 }
 
 * { box-sizing: border-box; }
+
+/* 폼 요소는 글꼴을 상속하지 않는다. 명시하지 않으면 검색창만 Arial 로 뜬다 */
+input, select, button, textarea { font-family: inherit; }
+
 html, body {
   margin: 0;
   padding: 0;
