@@ -456,10 +456,12 @@ label:has(> input[type="checkbox"]) {
   .card, .panel { opacity: 0; transform: translateY(14px); }
 }
 
-/* 스크롤에 맞춰 드러나기. ui.js 가 .in 을 붙인다 */
+/* 스크롤에 맞춰 드러나기. ui.js 가 .in 을 붙인다.
+ * 축소(scale)는 쓰지 않는다. 재생되는 동안 안에 있는 버튼까지 같이 줄어들어
+ * 44px 로 잡아 둔 터치 타깃이 잠깐 그보다 작아지기 때문이다. */
 .reveal {
   opacity: 0;
-  transform: translateY(18px) scale(0.985);
+  transform: translateY(18px);
   transition:
     opacity var(--slow) var(--smooth),
     transform var(--slow) var(--spring);
