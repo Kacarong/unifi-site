@@ -75,6 +75,18 @@ async def _password_gate(request: Request, call_next):
     return FileResponse(LOGIN_PAGE, status_code=401, media_type="text/html")
 
 
+@app.middleware("http")
+async def _cache_fonts(request: Request, call_next):
+    """글꼴 파일은 내용이 바뀌지 않는다. 한 번 받으면 다시 받지 않게 한다.
+
+    이게 없으면 방문할 때마다 수십 개 조각을 다시 내려받아 모바일에서 특히 느리다.
+    """
+    response = await call_next(request)
+    if request.url.path.startswith("/fonts/"):
+        response.headers["cache-control"] = "public, max-age=31536000, immutable"
+    return response
+
+
 class LoginBody(BaseModel):
     password: str = ""
 

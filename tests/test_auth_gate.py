@@ -50,6 +50,9 @@ def run() -> None:
     # 홈 화면 추가(PWA)와 브라우저 기본 아이콘 요청은 로그인 전에도 와야 한다
     check("매니페스트 통과", client.get("/manifest.webmanifest").status_code, 200)
     check("favicon 통과", client.get("/favicon.ico").status_code, 200)
+    # 로그인 화면도 같은 글꼴을 쓰므로 글꼴은 열려 있어야 한다
+    check("글꼴 CSS 통과", client.get("/fonts.css").status_code, 200)
+    check("글꼴 파일 통과", client.get("/fonts/PretendardVariable.subset.0.woff2").status_code, 200)
 
     print("3) 틀린 비밀번호는 거부")
     check("401", client.post("/api/_login", json={"password": "nope"}).status_code, 401)

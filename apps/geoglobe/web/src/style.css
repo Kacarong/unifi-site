@@ -1,3 +1,5 @@
+/* 글꼴(/fonts.css)은 index.html 에서 링크로 건다. 여기서 @import 하면
+ * Vite 가 빌드 때 로컬 에셋으로 찾으려 해서 실패한다. */
 :root {
   --bg: #0b1020;
   --panel: rgba(16, 22, 42, 0.94);
@@ -18,7 +20,8 @@ html, body {
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+  font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
   -webkit-tap-highlight-color: transparent;
 }
 
