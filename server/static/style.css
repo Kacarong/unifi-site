@@ -120,7 +120,9 @@
   min-height: 0;
 }
 
-.card.expanded .card-detail-inner { padding-top: 14px; }
+/* 제목과의 간격은 안쪽 첫 요소의 margin 으로 준다. 바깥에 padding 을 주면
+ * 펼치는 순간 그 높이만 먼저 툭 들어와, 아직 안 열렸는데 열린 것처럼 보인다. */
+.card-detail-inner > :first-child { margin-top: 14px; }
 
 .card-detail p { font-size: 13.5px; line-height: 1.65; }
 

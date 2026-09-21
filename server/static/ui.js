@@ -79,6 +79,19 @@
     }, 320);
   }
 
+  /* ── 페이지 전환 뒷정리 ───────────────────────────────── */
+  // 화면 전환이 도중에 취소되면(빠른 연속 이동 등) 브라우저가 그 약속을
+  // 거절하는데, 아무도 받지 않으면 콘솔에 오류로 남는다. 정상 동작이므로
+  // 받아서 조용히 넘긴다.
+  function quietTransitions() {
+    const swallow = (e) => e.viewTransition?.finished?.catch(() => {});
+    window.addEventListener('pageswap', swallow);
+    window.addEventListener('pagereveal', swallow);
+  }
+
+  // pagereveal 은 DOMContentLoaded 보다 먼저 오므로 바로 등록한다
+  quietTransitions();
+
   /* ── 초기화 ───────────────────────────────────────────── */
   function init() {
     observeReveals();
