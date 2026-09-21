@@ -32,8 +32,13 @@ class BuildSpec:
 class AppSpec:
     id: str
     name: str
+    # 카드 겉면에 보이는 한 줄. 비우면 description 의 첫 문장을 쓴다.
+    tagline: str = ""
+    # 카드를 펼쳤을 때 나오는 자세한 설명
     description: str = ""
     icon: str = "🧩"
+    # 카드 강조색(#rrggbb). 비우면 셸 기본색
+    accent: str = ""
     tags: list[str] = field(default_factory=list)
 
     # /apps/<id> 로 서빙할 정적 프론트엔드 (앱 폴더 기준 상대경로)
@@ -73,12 +78,22 @@ class AppSpec:
             return "needs_build"
         return "ready"
 
+    @property
+    def card_tagline(self) -> str:
+        """카드 겉면 한 줄. 따로 안 적었으면 설명의 첫 문장으로 대신한다."""
+        if self.tagline:
+            return self.tagline
+        head = self.description.split(". ")[0].strip()
+        return head.rstrip(".") if head else ""
+
     def to_json(self) -> dict:
         return {
             "id": self.id,
             "name": self.name,
+            "tagline": self.card_tagline,
             "description": self.description,
             "icon": self.icon,
+            "accent": self.accent,
             "tags": self.tags,
             "status": self.status,
             "error": self.error,

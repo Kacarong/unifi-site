@@ -17,29 +17,65 @@ function el(tag, cls, text) {
   return n;
 }
 
+/* 카드 겉면에는 아이콘·이름·한 줄·상태만 둔다. 긴 설명과 태그, 주의사항은
+ * '자세히' 를 눌렀을 때 펼쳐진다. */
 function card(app) {
-  const clickable = app.status === 'ready' && app.url;
-  const node = el(clickable ? 'a' : 'div', `card reveal${clickable ? '' : ' disabled'}`);
-  if (clickable) node.href = app.url;
+  const open = app.status === 'ready' && app.url;
+  const node = el('article', `card reveal${open ? '' : ' card-off'}`);
+  if (app.accent) node.style.setProperty('--accent', app.accent);
+  // 카드를 누르면 앱 화면으로 이어지듯 넘어가게 하는 이름표
+  node.style.setProperty('view-transition-name', `app-${app.id}`);
 
-  const head = el('div', 'row');
+  const head = el('div', 'card-head');
   head.append(el('span', 'card-icon', app.icon || '🧩'));
-  head.append(el('span', `badge ${app.status}`, STATUS_LABEL[app.status] || app.status));
+
+  const titles = el('div', 'card-titles');
+  titles.append(el('h3', null, app.name));
+  const tagline = app.tagline || '';
+  if (tagline) titles.append(el('p', 'card-tagline', tagline));
+  head.append(titles);
   node.append(head);
 
-  node.append(el('h3', null, app.name));
-  node.append(el('p', 'muted card-desc', app.description || ''));
+  const foot = el('div', 'card-foot');
+  foot.append(el('span', `badge ${app.status}`, STATUS_LABEL[app.status] || app.status));
+
+  const more = el('button', 'btn ghost card-more');
+  more.type = 'button';
+  more.append(el('span', null, '자세히'));
+  more.append(el('span', 'chev', '▾'));
+  foot.append(more);
+
+  if (open) {
+    const go = el('a', 'btn primary card-open', '열기');
+    go.href = app.url;
+    foot.append(go);
+  }
+  node.append(foot);
+
+  // 펼쳐지는 부분 — 높이 애니메이션을 위해 grid 한 겹을 덧댄다
+  const wrap = el('div', 'card-detail');
+  const inner = el('div', 'card-detail-inner');
+  if (app.description) inner.append(el('p', 'muted', app.description));
 
   if (app.tags && app.tags.length) {
     const tags = el('div', 'tags');
     app.tags.forEach((t) => tags.append(el('span', 'chip', t)));
-    node.append(tags);
+    inner.append(tags);
   }
 
   const note = app.notes || NOTE_BY_STATUS[app.status];
-  if (note) node.append(el('div', 'note', note));
+  if (note) inner.append(el('div', 'note', note));
 
-  if (clickable) node.append(el('div', 'card-go', '열기 →'));
+  wrap.append(inner);
+  node.append(wrap);
+
+  more.addEventListener('click', () => {
+    const nowOpen = node.classList.toggle('expanded');
+    more.setAttribute('aria-expanded', String(nowOpen));
+    more.firstChild.textContent = nowOpen ? '접기' : '자세히';
+  });
+  more.setAttribute('aria-expanded', 'false');
+
   return node;
 }
 
@@ -48,7 +84,7 @@ function skeletons(grid, n = 3) {
   grid.innerHTML = '';
   for (let i = 0; i < n; i += 1) {
     const s = el('div', 'skeleton');
-    s.style.height = '188px';
+    s.style.height = '150px';
     grid.append(s);
   }
 }

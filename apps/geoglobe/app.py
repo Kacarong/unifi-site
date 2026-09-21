@@ -8,6 +8,8 @@ from server.registry import AppSpec, BuildSpec
 SPEC = AppSpec(
     id="geoglobe",
     name="지오글로브",
+    tagline="지구본으로 지리 익히고 퀴즈로 복습",
+    accent="#22c9a0",
     icon="🌍",
     description="Cesium 지구본 위에서 국가·도시·강·해협 레이어를 켜고 끄며 지리를 익히고, 퀴즈로 복습합니다.",
     tags=["지도", "학습", "프론트엔드"],

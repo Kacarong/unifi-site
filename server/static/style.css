@@ -19,22 +19,110 @@
 
 .hero p { margin-top: 8px; font-size: 14px; }
 
-/* ── 앱 카드 ──────────────────────────────────────────── */
+/* ── 앱 카드 ──────────────────────────────────────────────
+ * 앱마다 자기 강조색(--accent)을 쓴다. 배경은 그 색을 아주 옅게 깐
+ * 틴트, 테두리는 같은 색을 진하게. 겉면에는 최소한만 둔다. */
+.card {
+  --tint: color-mix(in srgb, var(--accent) 9%, transparent);
+  --edge: color-mix(in srgb, var(--accent) 42%, transparent);
+  padding: 18px 16px 14px;
+  border-color: var(--edge);
+  background: linear-gradient(180deg, var(--tint), transparent 70%), var(--panel);
+}
+
+/* color-mix 를 모르는 오래된 브라우저에서도 카드가 보이게 */
+@supports not (background: color-mix(in srgb, red 10%, transparent)) {
+  .card { border-color: var(--line-strong); }
+}
+
+.card-head { display: flex; align-items: flex-start; gap: 12px; }
+
 .card-icon {
-  font-size: 30px;
-  line-height: 1;
+  font-size: 26px;
+  line-height: 1.2;
   filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5));
   transition: transform var(--base) var(--spring);
 }
 
-.card:active .card-icon { transform: scale(1.12) rotate(-6deg); }
+.card:active .card-icon { transform: scale(1.1) rotate(-6deg); }
 
-@media (hover: hover) and (pointer: fine) {
-  .card:hover .card-icon { transform: scale(1.1) rotate(-5deg); }
+.card-titles { min-width: 0; }
+.card h3 { color: var(--accent); }
+
+.card-tagline {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--sub);
 }
 
-.card h3 { margin: 12px 0 6px; }
-.card-desc { font-size: 13.5px; }
+/* 아래 줄: 상태 · 자세히 · 열기 */
+.card-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.card-foot .badge { margin-right: auto; }
+
+.btn.ghost {
+  border-color: transparent;
+  background: none;
+  color: var(--sub);
+  padding: 0 10px;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.card-more .chev {
+  display: inline-block;
+  transition: transform var(--base) var(--spring);
+}
+
+.card.expanded .card-more .chev { transform: rotate(180deg); }
+
+/* 버튼도 카드 색을 따른다. ui.css 의 `.btn.primary` 가 전역 보라로 끝나는데
+ * 그쪽이 선택자 우선순위가 높으므로 여기서도 같은 무게로 맞춰 이긴다. */
+.card-open.btn.primary {
+  padding: 0 16px;
+  font-size: 13.5px;
+  background: linear-gradient(
+    135deg,
+    var(--accent),
+    color-mix(in srgb, var(--accent) 60%, #ffffff)
+  );
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 32%, transparent);
+  color: #0a0f1c;
+}
+
+.card-off { opacity: 0.62; }
+.card-off .card-open { display: none; }
+
+/* ── 펼쳐지는 상세 ────────────────────────────────────────
+ * height:auto 는 전환이 안 되므로, grid 행 크기를 0fr → 1fr 로 움직인다.
+ * 내용 높이를 몰라도 자연스럽게 열리고 닫힌다. */
+.card-detail {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows var(--base) var(--spring),
+    opacity var(--base) var(--smooth);
+}
+
+.card.expanded .card-detail {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.card-detail-inner {
+  overflow: hidden;           /* 0fr 일 때 내용이 삐져나오지 않게 */
+  min-height: 0;
+}
+
+.card.expanded .card-detail-inner { padding-top: 14px; }
+
+.card-detail p { font-size: 13.5px; line-height: 1.65; }
 
 .tags { margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
 
@@ -43,21 +131,6 @@
   font-size: 12.5px;
   color: var(--warn);
   line-height: 1.55;
-}
-
-/* "열기 →" 는 항상 보인다. 터치 기기에는 hover 가 없어서, 숨겨 두는
- * 연출은 그 기기에서 영영 안 보이는 결과로 끝난다. 마우스가 있으면
- * 화살표가 살짝 밀려 나가는 정도로만 반응한다. */
-.card-go {
-  margin-top: 14px;
-  font-size: 13px;
-  font-weight: 650;
-  color: var(--accent);
-  transition: transform var(--base) var(--spring);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .card:hover .card-go { transform: translateX(5px); }
 }
 
 /* ── 푸터 ─────────────────────────────────────────────── */

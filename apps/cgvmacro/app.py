@@ -16,6 +16,8 @@ def _router_factory():
 SPEC = AppSpec(
     id="cgvmacro",
     name="CGV 좌석 감시",
+    tagline="취소표·상영 오픈 감시 + 디스코드 알림",
+    accent="#ff4a54",
     icon="🎟️",
     description="취소표·상영 오픈을 서버에서 감시하고 디스코드로 알립니다. 좌석 선점은 로컬 PC 에이전트가 로그인된 크롬으로 처리합니다.",
     tags=["감시", "알림", "로컬 에이전트"],

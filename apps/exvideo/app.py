@@ -16,6 +16,8 @@ def _router_factory():
 SPEC = AppSpec(
     id="exvideo",
     name="ex-video",
+    tagline="강의 영상 → 전사·슬라이드·그림 한 번에",
+    accent="#4f8dff",
     icon="🎬",
     description="강의 영상(드라이브 링크·URL·로컬 경로)을 넣으면 음성 전사 + 슬라이드 OCR + 그림 크롭을 묶어 bundle.md 로 만들어 줍니다.",
     tags=["영상", "OCR", "GPU"],
