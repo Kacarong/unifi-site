@@ -227,17 +227,40 @@ async function preview() {
 
 // 영화·극장 칸은 셸의 공용 자동완성을 쓴다. 브라우저 기본 datalist 는
 // CSS 가 전혀 안 먹어서 사이트 톤과 따로 놀았다.
-const movieBox = window.unifiUI?.combobox($('f_movie'), { emptyText: '그런 영화가 없습니다' });
-const theaterBox = window.unifiUI?.combobox($('f_theater'), { emptyText: '그런 극장이 없습니다' });
+//
+// 영화 편성은 계속 바뀐다. 페이지를 오래 열어 두면 목록이 낡으므로,
+// 사용자가 칸을 열 때마다 신선도를 확인하고 오래됐으면 조용히 새로 받는다.
+// (서버가 10분간 보관하므로 CGV 를 실제로 두드리는 일은 드물다)
+const LIST_FRESH_MS = 5 * 60 * 1000;
+let listsAt = 0;
+let listsInFlight = null;
 
-async function loadLists() {
-  try {
-    const [movies, theaters] = await Promise.all([api('/movies'), api('/theaters')]);
-    movieBox?.setOptions(movies.map((m) => m.name));
-    theaterBox?.setOptions(theaters.map((t) => t.name));
-  } catch (e) {
-    /* 목록은 없어도 직접 입력하면 된다 */
-  }
+const movieBox = window.unifiUI?.combobox($('f_movie'), {
+  emptyText: '그런 영화가 없습니다',
+  onOpen: () => loadLists(),
+});
+const theaterBox = window.unifiUI?.combobox($('f_theater'), {
+  emptyText: '그런 극장이 없습니다',
+  onOpen: () => loadLists(),
+});
+
+async function loadLists({ force = false } = {}) {
+  if (!force && Date.now() - listsAt < LIST_FRESH_MS) return;
+  if (listsInFlight) return listsInFlight;   // 동시에 두 칸을 열어도 한 번만 부른다
+
+  listsInFlight = (async () => {
+    try {
+      const [movies, theaters] = await Promise.all([api('/movies'), api('/theaters')]);
+      movieBox?.setOptions(movies.map((m) => m.name));
+      theaterBox?.setOptions(theaters.map((t) => t.name));
+      listsAt = Date.now();
+    } catch (e) {
+      /* 목록은 없어도 직접 입력하면 된다. 다음 기회에 다시 시도한다 */
+    } finally {
+      listsInFlight = null;
+    }
+  })();
+  return listsInFlight;
 }
 
 // ---------------- 초기화 ----------------

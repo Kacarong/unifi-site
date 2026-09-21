@@ -166,6 +166,7 @@
     };
 
     const open = () => {
+      const justOpened = list.hidden;
       const q = input.value.trim().toLowerCase();
       shown = (q ? items.filter((n) => n.toLowerCase().includes(q)) : items).slice(0, MAX_SHOWN);
       active = -1;
@@ -174,6 +175,12 @@
       wrap.classList.add('open');
       input.setAttribute('aria-expanded', 'true');
       reposition();
+      // 목록 내용이 시간이 지나면 바뀌는 경우(영화 편성 등)를 위해 알려 준다.
+      // 앱이 필요하면 새로 받아 setOptions 로 갈아끼운다. 글자를 칠 때마다가
+      // 아니라 닫혀 있다 열릴 때만 부른다.
+      if (justOpened) {
+        try { opts.onOpen?.(); } catch { /* 갱신 실패가 목록을 막으면 안 된다 */ }
+      }
     };
 
     // 스크롤·회전·키보드 등장으로 위치가 바뀌면 따라간다

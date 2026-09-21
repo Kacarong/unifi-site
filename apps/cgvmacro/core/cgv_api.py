@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -123,25 +124,55 @@ def _to_int(v: Any) -> int:
 
 
 # ---------------- 목록(드롭다운용) ----------------
+# 영화 목록은 새 영화가 걸릴 때마다 바뀌고, 극장 목록은 거의 안 바뀐다.
+# 화면에서 자주 새로 불러도 CGV 를 그대로 두드리지 않도록 잠깐 보관한다.
+MOVIES_TTL = 600        # 10분
+THEATERS_TTL = 21600    # 6시간
+_list_cache: dict[str, tuple[float, Any]] = {}
+
+
+def _cached(key: str, ttl: float, fetch):
+    """보관 기간 안이면 가진 값을 주고, 지났으면 새로 받는다.
+
+    새로 받다가 실패하면 예전 값이라도 돌려준다. 목록이 잠깐 통째로
+    사라지는 것보다 조금 오래된 목록을 보여 주는 편이 낫다.
+    """
+    now = time.time()
+    hit = _list_cache.get(key)
+    if hit and now - hit[0] < ttl:
+        return hit[1]
+    try:
+        value = fetch()
+    except Exception:
+        if hit:
+            logger.warning("%s 목록 갱신 실패 — 이전 목록을 유지합니다", key)
+            return hit[1]
+        raise
+    _list_cache[key] = (now, value)
+    return value
+
+
 def list_movies() -> list[tuple[str, str]]:
     """예매 가능한 영화 목록 → [(movNo, movNm), ...]."""
-    data = _get("searchAtktTopPostrList", coCd=CO_CD, movNm="", div="", attrCd="") or []
-    out = []
-    for m in data:
-        if m.get("movNo"):
-            out.append((str(m.get("movNo")), str(m.get("movNm"))))
-    return out
+    def fetch() -> list[tuple[str, str]]:
+        data = _get("searchAtktTopPostrList", coCd=CO_CD, movNm="", div="", attrCd="") or []
+        return [(str(m["movNo"]), str(m.get("movNm"))) for m in data if m.get("movNo")]
+
+    return _cached("movies", MOVIES_TTL, fetch)
 
 
 def list_theaters() -> list[tuple[str, str, str]]:
     """극장 목록 → [(siteNo, siteNm, regionNm), ...]."""
-    data = _get("searchRegnList", coCd=CO_CD) or []
-    out = []
-    for reg in data:
-        rn = str(reg.get("regnGrpNm", ""))
-        for s in reg.get("siteList", []):
-            out.append((str(s.get("siteNo")), str(s.get("siteNm")), rn))
-    return out
+    def fetch() -> list[tuple[str, str, str]]:
+        data = _get("searchRegnList", coCd=CO_CD) or []
+        out = []
+        for reg in data:
+            rn = str(reg.get("regnGrpNm", ""))
+            for s in reg.get("siteList", []):
+                out.append((str(s.get("siteNo")), str(s.get("siteNm")), rn))
+        return out
+
+    return _cached("theaters", THEATERS_TTL, fetch)
 
 
 # ---------------- 코드 해석 ----------------
