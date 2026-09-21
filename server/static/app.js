@@ -30,7 +30,17 @@ function card(app) {
   head.append(el('span', 'card-icon', app.icon || '🧩'));
 
   const titles = el('div', 'card-titles');
-  titles.append(el('h3', null, app.name));
+  const h = el('h3');
+  if (open) {
+    // 제목을 링크로 두고 CSS 로 카드 전체까지 늘린다. 카드 아무 데나 눌러도
+    // 열리면서, 진짜 링크라서 새 탭으로 열기·키보드 이동·스크린리더가 그대로 된다.
+    const link = el('a', 'card-link', app.name);
+    link.href = app.url;
+    h.append(link);
+  } else {
+    h.textContent = app.name;
+  }
+  titles.append(h);
   const tagline = app.tagline || '';
   if (tagline) titles.append(el('p', 'card-tagline', tagline));
   head.append(titles);
@@ -44,12 +54,6 @@ function card(app) {
   more.append(el('span', null, '자세히'));
   more.append(el('span', 'chev', '▾'));
   foot.append(more);
-
-  if (open) {
-    const go = el('a', 'btn primary card-open', '열기');
-    go.href = app.url;
-    foot.append(go);
-  }
   node.append(foot);
 
   // 펼쳐지는 부분 — 높이 애니메이션을 위해 grid 한 겹을 덧댄다
@@ -115,4 +119,11 @@ async function load() {
   }
 }
 
+/* 저작권 연도는 해가 바뀌면 자동으로 따라가게 한다 */
+function stampYear() {
+  const y = document.getElementById('year');
+  if (y) y.textContent = String(new Date().getFullYear());
+}
+
+stampYear();
 load();
