@@ -84,9 +84,23 @@
   // 거절하는데, 아무도 받지 않으면 콘솔에 오류로 남는다. 정상 동작이므로
   // 받아서 조용히 넘긴다.
   function quietTransitions() {
-    const swallow = (e) => e.viewTransition?.finished?.catch(() => {});
+    const swallow = (e) => {
+      const vt = e.viewTransition;
+      if (!vt) return;
+      // 거절될 수 있는 약속을 모두 받아 둔다. 하나라도 빠뜨리면 그게 오류로 남는다
+      vt.ready?.catch(() => {});
+      vt.finished?.catch(() => {});
+      vt.updateCallbackDone?.catch(() => {});
+    };
     window.addEventListener('pageswap', swallow);
     window.addEventListener('pagereveal', swallow);
+
+    // 위에서 못 잡는 경로(전환이 시작되기도 전에 취소되는 경우)를 위한 마지막 그물.
+    // 화면 전환이 건너뛰어졌다는 것뿐이라 동작에는 영향이 없다.
+    window.addEventListener('unhandledrejection', (e) => {
+      const msg = String(e.reason?.message || e.reason || '');
+      if (/transition was skipped|transition was aborted/i.test(msg)) e.preventDefault();
+    });
   }
 
   // pagereveal 은 DOMContentLoaded 보다 먼저 오므로 바로 등록한다
