@@ -128,8 +128,24 @@ async function showIndex() {
     return `<option value="${s.id}">${s.title} ${where.length ? `(${where.join(", ")})` : ""}</option>`;
   }).join("");
 
+  await loadProviders();
   $("notesBuild").classList.remove("hidden");
   renderOutputs(body.outputs);
+}
+
+// 정리본을 만들 모델 고르기. 못 쓰는 것도 이유와 함께 남겨 둔다 —
+// 목록에서 그냥 사라지면 "왜 클로드가 없지" 하고 헤매게 된다.
+async function loadProviders() {
+  const sel = $("nProvider");
+  if (sel.options.length) return;
+  const list = await (await fetch(`${API}/notes/providers`)).json();
+  sel.innerHTML = list.map((p) =>
+    `<option value="${p.id}"${p.ready ? "" : " disabled"}>` +
+    `${p.label}${p.model ? ` · ${p.model}` : ""}${p.ready ? "" : ` — ${p.reason}`}</option>`
+  ).join("");
+  const preferred = list.find((p) => p.ready && p.id === "claude-cli")
+    || list.find((p) => p.ready);
+  if (preferred) sel.value = preferred.id;
 }
 
 async function renderNotes() {
@@ -146,6 +162,7 @@ async function renderNotes() {
         sections: sections.length ? sections : null,
         raw_sections: $("nRaw").checked && sections.length ? sections : null,
         note: $("nNote").value.trim(),
+        provider: $("nProvider").value || null,
       }),
     })).json();
     if (await notesJob(job_id, "정리본")) {
@@ -161,11 +178,12 @@ function renderOutputs(outputs) {
   if (!outputs || !outputs.length) return;
   $("nOutputs").classList.remove("hidden");
   $("nOutputs").innerHTML = outputs.map((o) => {
-    const warn = o.foreign_ratio > 0.05
-      ? ` ⚠ 한국어 이탈 ${Math.round(o.foreign_ratio * 100)}%` : "";
+    const warn = (o.foreign_ratio > 0.05
+      ? ` ⚠ 한국어 이탈 ${Math.round(o.foreign_ratio * 100)}%` : "")
+      + (o.chunks > 1 ? ` ⚠ ${o.chunks}조각으로 이어 씀 (이은 자리 확인 필요)` : "");
     return `<div><a href="${API}/notes/sources/${sourceId}/outputs/${o.render_id}.pdf"` +
       ` target="_blank">${o.render_id}.pdf</a> — ${o.parts.join(", ")}` +
-      ` · 입력 ${o.input_tokens}토큰${warn}</div>`;
+      ` · ${o.provider || "?"} · 입력 ${o.input_tokens}토큰${warn}</div>`;
   }).join("");
 }
 

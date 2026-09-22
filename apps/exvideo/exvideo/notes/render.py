@@ -143,6 +143,10 @@ def generate(source_id: str, *, parts: list[str], section_ids: list[str] | None 
         report(f"[경고] 한국어 이탈 {drift:.0%} — 이 구성은 더 큰 모델이 필요합니다"
                " (EXVIDEO_LLM_FALLBACK 에 claude/gemini 지정)", 50)
 
+    if res.chunks > 1:
+        report(f"[경고] 답변이 {res.chunks}조각으로 나뉘어 이어졌습니다 — 이은 자리에서"
+               " 몇 줄이 빠졌을 수 있습니다. 구성을 나눠서 만드는 편이 안전합니다.", 70)
+
     render_id = time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:4]
     out_dir = idx.source_dir(source_id, "outputs")
     md_path = os.path.join(out_dir, f"{render_id}.md")
@@ -163,6 +167,8 @@ def generate(source_id: str, *, parts: list[str], section_ids: list[str] | None 
         "prompt_chars": len(prompt),
         # 0 이 아니면 모델이 한국어를 벗어난 것 — 유료 모델로 바꿀 근거가 된다
         "foreign_ratio": round(drift, 3),
+        # 1 보다 크면 답변이 잘려 이어 쓴 것 — 이은 자리가 성글 수 있다
+        "chunks": res.chunks,
     }
     idx.log_usage(source_id, usage)
 

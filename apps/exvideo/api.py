@@ -243,6 +243,13 @@ def get_source(source_id: str) -> dict:
     }
 
 
+@router.get("/notes/providers")
+def list_providers() -> list[dict]:
+    from .exvideo.notes import llm as notes_llm
+
+    return notes_llm.availability()
+
+
 class IndexRequest(BaseModel):
     provider: str | None = None
     model: str | None = None

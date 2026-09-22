@@ -290,8 +290,51 @@ def test_normalize() -> None:
     ok("본문은 살아 있다", "x^3 - x - 1 = 0" in got)
 
 
+def test_claude_cli_stream() -> None:
+    """계정 연동 클로드 — 답변이 잘려 이어질 때 앞부분을 잃지 않는가.
+
+    실제로 났던 사고다. `--output-format json` 의 `result` 에는 마지막 조각만
+    담겨서, 10쪽짜리 정리본의 앞 절반이 통째로 사라진 채 PDF 가 나왔다.
+    여기서는 그 스트림을 그대로 재현해 고정한다.
+    """
+    print("\n[9] 계정 연동 클로드 — 이어 쓴 답변을 온전히 모으는가")
+    from apps.exvideo.exvideo.notes.llm import ClaudeCLIProvider, _join_overlap
+
+    check("겹치지 않으면 그냥 붙인다", _join_overlap("가나", "다라"), "가나다라")
+    check("겹친 만큼만 덜어낸다", _join_overlap("49줄\n50", "50줄\n51"), "49줄\n50줄\n51")
+    check("한쪽이 비면 나머지", _join_overlap("", "다라"), "다라")
+
+    def ev(kind: str, **rest) -> str:
+        return json.dumps({"type": kind, **rest})
+
+    def say(text: str) -> str:
+        return ev("assistant", message={"content": [{"type": "text", "text": text}]})
+
+    stream = "\n".join([
+        ev("system", subtype="init"),
+        say(""),                       # 빈 조각은 세지 않는다
+        say("# 목차\n1장\n2장"),
+        say("2장\n3장"),               # 이어 쓰기 — 경계가 겹친다
+        ev("result", is_error=False, result="2장\n3장",
+           usage={"input_tokens": 10, "cache_read_input_tokens": 5,
+                  "cache_creation_input_tokens": 2, "output_tokens": 7}),
+    ])
+    text, usage, error, chunks = ClaudeCLIProvider._collect_text(stream)
+    check("앞부분이 살아 있다", text, "# 목차\n1장\n2장\n3장")
+    check("이어 쓴 횟수를 센다", chunks, 2)
+    check("입력 토큰은 캐시까지 합산",
+          usage["input_tokens"] + usage["cache_read_input_tokens"]
+          + usage["cache_creation_input_tokens"], 17)
+    check("오류 없음", error, "")
+
+    err = "\n".join([say("부분 답변"),
+                     ev("result", is_error=True, result="rate limit", usage={})])
+    _, _, error, _ = ClaudeCLIProvider._collect_text(err)
+    ok("오류는 삼키지 않는다", "rate limit" in error, error)
+
+
 def test_pdf_output(meta: dict) -> None:
-    print("\n[9] 결과물 PDF — 한글이 깨지지 않는가")
+    print("\n[10] 결과물 PDF — 한글이 깨지지 않는가")
     ok("PDF 가 생겼다", os.path.exists(meta["pdf"]))
     pages = extract.pdf_pages(meta["pdf"])
     text = "\n".join(p.text for p in pages)
@@ -302,7 +345,7 @@ def test_pdf_output(meta: dict) -> None:
 
 
 def test_api(pdf_path: str) -> None:
-    print("\n[10] API 왕복")
+    print("\n[11] API 왕복")
     from fastapi.testclient import TestClient
     from server.main import app
 
@@ -364,6 +407,7 @@ def run() -> None:
     test_merge()
     meta = test_index_and_render(pdf_path)
     test_normalize()
+    test_claude_cli_stream()
     test_pdf_output(meta)
     test_api(pdf_path)
     shutil.rmtree(work, ignore_errors=True)
