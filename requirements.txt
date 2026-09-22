@@ -3,3 +3,10 @@
 fastapi>=0.110
 uvicorn[standard]>=0.29
 pydantic>=2.0
+
+# 요약정리본(ex-video 의 /notes) — 가볍고 GPU 가 필요 없어서 기본에 둔다.
+# 무거운 영상 처리(opencv/whisper/easyocr)만 apps/exvideo/requirements.txt 로 뺀다.
+PyMuPDF>=1.24            # 강의자료 PDF 글자 추출 (LLM 불필요)
+reportlab>=4.0           # 한글 정리본 PDF 조판
+python-multipart>=0.0.9  # PDF 업로드 폼 파싱
+httpx>=0.27              # LLM 프로바이더 호출

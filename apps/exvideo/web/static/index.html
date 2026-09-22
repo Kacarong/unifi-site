@@ -118,6 +118,53 @@
     <label>bundle.md 미리보기 (전체 복사해서 Gemini/Claude에 붙여넣으세요)</label>
     <pre class="preview" id="preview"></pre>
   </section>
+
+  <!-- ─────────────── 요약정리본 PDF ─────────────── -->
+  <section class="hero reveal" style="margin-top:30px">
+    <h1>📘 요약정리본 PDF</h1>
+    <p class="muted">전사 + 강의자료 PDF → 한 번만 색인 → 원하는 구성을 골라 정리본 PDF</p>
+  </section>
+
+  <section class="panel reveal" id="notesUpload">
+    <label>강의 이름
+      <input id="nTitle" type="text" placeholder="미적분학 I · 3주차" />
+    </label>
+    <label>강의자료 PDF
+      <input id="nPdf" type="file" accept="application/pdf" />
+    </label>
+    <label>전사 — 위에서 추출한 작업 번호를 넣거나 아래에 직접 붙여넣기
+      <input id="nJobId" type="text" placeholder="작업 번호 (비워도 됩니다)" />
+    </label>
+    <textarea id="nTranscript" rows="4"
+      placeholder="[00:00:00] 전사를 직접 붙여넣어도 됩니다"></textarea>
+    <div class="hint">
+      PDF 글자 추출에는 LLM 을 쓰지 않습니다(PyMuPDF — 토큰 0). 색인은 <b>한 번만</b>
+      돌고, 이후 정리본 요청은 색인만 입력으로 씁니다. 원본을 통째로 다시 읽지 않습니다.
+    </div>
+    <button id="nCreateBtn" class="btn primary full">업로드하고 색인 만들기</button>
+  </section>
+
+  <section class="panel reveal hidden" id="notesProgress">
+    <div id="nStatus">준비 중…</div>
+    <div class="bar"><div id="nBar"></div></div>
+    <div class="log" id="nLog"></div>
+  </section>
+
+  <section class="panel reveal hidden" id="notesBuild">
+    <div class="hint" id="nIndexInfo"></div>
+    <label>어떤 구성으로 만들까요</label>
+    <div class="opts" id="nParts"></div>
+    <label>섹션 고르기 — 아무것도 안 고르면 전체
+      <select id="nSections" multiple size="6"></select>
+    </label>
+    <label><input type="checkbox" id="nRaw" /> 고른 섹션은 원문까지 다시 읽기
+      (예제·수식을 정확히 옮겨야 할 때만)</label>
+    <label>추가 요청
+      <input id="nNote" type="text" placeholder="예: 예상문제 위주로, 표 없이" />
+    </label>
+    <button id="nRenderBtn" class="btn primary full">정리본 PDF 만들기</button>
+    <div class="log hidden" id="nOutputs"></div>
+  </section>
 </div>
 
 <script src="/ui.js"></script>

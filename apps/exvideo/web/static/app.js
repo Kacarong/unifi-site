@@ -63,6 +63,115 @@ async function loadPreview() {
   } catch (e) { /* ignore */ }
 }
 
+// ─────────────────────────── 요약정리본 ───────────────────────────
+
+let sourceId = null;
+
+async function notesJob(jobId, label) {
+  $("notesProgress").classList.remove("hidden");
+  for (;;) {
+    const j = await (await fetch(`${API}/notes/jobs/${jobId}`)).json();
+    $("nBar").style.width = (j.progress || 0) + "%";
+    $("nStatus").textContent = `${label}: ${statusKo(j.status)} (${j.progress || 0}%)`;
+    $("nLog").textContent = (j.messages || []).join("\n");
+    $("nLog").scrollTop = $("nLog").scrollHeight;
+    if (j.status === "done") return j.result;
+    if (j.status === "error") { alert(`${label} 실패: ${j.error}`); return null; }
+    await new Promise((r) => setTimeout(r, 1500));
+  }
+}
+
+async function createSource() {
+  const fd = new FormData();
+  fd.append("title", $("nTitle").value.trim());
+  fd.append("job_id", $("nJobId").value.trim());
+  fd.append("transcript", $("nTranscript").value.trim());
+  const file = $("nPdf").files[0];
+  if (file) fd.append("pdf", file);
+  if (!file && !$("nJobId").value.trim() && !$("nTranscript").value.trim()) {
+    alert("강의자료 PDF 나 전사 중 하나는 있어야 합니다.");
+    return;
+  }
+
+  $("nCreateBtn").disabled = true;
+  try {
+    const res = await fetch(`${API}/notes/sources`, { method: "POST", body: fd });
+    if (!res.ok) { alert("업로드 실패: " + (await res.text())); return; }
+    sourceId = (await res.json()).source_id;
+
+    const { job_id } = await (await fetch(`${API}/notes/sources/${sourceId}/index`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+    })).json();
+    // 색인은 원본 전체를 읽으므로 한 번뿐이고 제일 오래 걸린다
+    if (await notesJob(job_id, "색인")) await showIndex();
+  } finally {
+    $("nCreateBtn").disabled = false;
+  }
+}
+
+async function showIndex() {
+  const body = await (await fetch(`${API}/notes/sources/${sourceId}`)).json();
+  const idx = body.index;
+  const used = body.usage.find((u) => u.stage === "index") || {};
+  $("nIndexInfo").innerHTML =
+    `색인 v${idx.version} · 섹션 ${idx.sections.length}개 · ` +
+    `${idx.provider.name}/${idx.provider.model} · ` +
+    `입력 ${used.input_tokens ?? "?"}토큰 (이 비용은 한 번만 듭니다)`;
+
+  const parts = await (await fetch(`${API}/notes/parts`)).json();
+  $("nParts").innerHTML = parts.map((p, i) =>
+    `<label title="${p.desc}"><input type="checkbox" value="${p.id}"` +
+    `${i < 3 ? " checked" : ""} /> ${p.name}</label>`).join("");
+
+  $("nSections").innerHTML = idx.sections.map((s) => {
+    const where = [s.pages.length ? `p.${s.pages[0]}` : "", s.time_start].filter(Boolean);
+    return `<option value="${s.id}">${s.title} ${where.length ? `(${where.join(", ")})` : ""}</option>`;
+  }).join("");
+
+  $("notesBuild").classList.remove("hidden");
+  renderOutputs(body.outputs);
+}
+
+async function renderNotes() {
+  const parts = [...$("nParts").querySelectorAll("input:checked")].map((c) => c.value);
+  if (!parts.length) { alert("구성을 하나 이상 고르세요."); return; }
+  const sections = [...$("nSections").selectedOptions].map((o) => o.value);
+
+  $("nRenderBtn").disabled = true;
+  try {
+    const { job_id } = await (await fetch(`${API}/notes/sources/${sourceId}/render`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        parts,
+        sections: sections.length ? sections : null,
+        raw_sections: $("nRaw").checked && sections.length ? sections : null,
+        note: $("nNote").value.trim(),
+      }),
+    })).json();
+    if (await notesJob(job_id, "정리본")) {
+      const body = await (await fetch(`${API}/notes/sources/${sourceId}`)).json();
+      renderOutputs(body.outputs);
+    }
+  } finally {
+    $("nRenderBtn").disabled = false;
+  }
+}
+
+function renderOutputs(outputs) {
+  if (!outputs || !outputs.length) return;
+  $("nOutputs").classList.remove("hidden");
+  $("nOutputs").innerHTML = outputs.map((o) => {
+    const warn = o.foreign_ratio > 0.05
+      ? ` ⚠ 한국어 이탈 ${Math.round(o.foreign_ratio * 100)}%` : "";
+    return `<div><a href="${API}/notes/sources/${sourceId}/outputs/${o.render_id}.pdf"` +
+      ` target="_blank">${o.render_id}.pdf</a> — ${o.parts.join(", ")}` +
+      ` · 입력 ${o.input_tokens}토큰${warn}</div>`;
+  }).join("");
+}
+
+$("nCreateBtn").addEventListener("click", createSource);
+$("nRenderBtn").addEventListener("click", renderNotes);
+
 $("startBtn").addEventListener("click", startJob);
 $("dlZip").addEventListener("click", () => { window.location = `${API}/jobs/${currentJob}/download`; });
 $("dlBundle").addEventListener("click", () => { window.open(`${API}/jobs/${currentJob}/bundle`, "_blank"); });
