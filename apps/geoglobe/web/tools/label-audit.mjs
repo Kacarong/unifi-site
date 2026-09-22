@@ -21,7 +21,14 @@ const browser = await chromium.launch({
   executablePath: process.env.GEO_CHROME || undefined,
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
 });
-const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+// 로그인이 걸린 실제 사이트를 볼 때: GEO_COOKIE="이름=값" 으로 세션 쿠키를 넘긴다
+if (process.env.GEO_COOKIE) {
+  const [name, ...rest] = process.env.GEO_COOKIE.split('=');
+  const u = new URL(url);
+  await context.addCookies([{ name, value: rest.join('='), domain: u.hostname, path: '/' }]);
+}
+const page = await context.newPage();
 page.on('console', (m) => { if (m.type() === 'error' && !/404/.test(m.text())) console.error('[page]', m.text()); });
 await page.goto(url, { waitUntil: 'domcontentloaded' });
 
