@@ -13,6 +13,13 @@ const LOW_POWER =
   Math.min(screen.width, screen.height) <= 820 ||
   (navigator.hardwareConcurrency || 8) <= 4;
 
+/* 렌더 배율.
+ * Cesium 은 기기 픽셀비(폰은 보통 3)에 이 값을 곱해서 그린다.
+ * 멈춰 있을 때는 또렷하게(SHARP), 움직이는 동안만 잠깐 낮춘다(MOVING).
+ * 움직이는 화면에서는 해상도가 낮아진 게 눈에 띄지 않는다. */
+const SHARP_SCALE = LOW_POWER ? 1 : Math.min(window.devicePixelRatio || 1, 2);
+const MOVING_SCALE = LOW_POWER ? 0.6 : SHARP_SCALE;
+
 // 선택: Cesium ion 토큰이 있으면 3D 지형 + 위성영상 품질 향상
 const ionToken = import.meta.env.VITE_CESIUM_ION_TOKEN;
 if (ionToken) Cesium.Ion.defaultAccessToken = ionToken;
@@ -74,15 +81,14 @@ async function init() {
 
   const scene = viewer.scene;
 
-  // 화질 — 저사양에선 한 단계씩 낮춘다.
-  //
-  // useBrowserRecommendedResolution:false 라서 Cesium 은 기기 픽셀비(폰은 보통 3)
-  // 그대로 그린다. resolutionScale 1 은 "그 위에 1배"라 실제로는 3배 해상도,
-  // 즉 픽셀이 9배다. 이게 폰에서 끊기는 가장 큰 원인이었다. 1.5배로 낮춘다
-  // (픽셀 1/4). 글자는 여전히 또렷하고 프레임은 크게 벌어진다.
-  const dpr = window.devicePixelRatio || 1;
-  viewer.resolutionScale = LOW_POWER ? Math.min(1, 1.5 / dpr) : Math.min(dpr, 2);
-  scene.globe.maximumScreenSpaceError = LOW_POWER ? 3 : 1.5; // 클수록 타일 적게 = 가볍다
+  /* 화질 — 멈춰 있을 때는 기기 해상도 그대로 또렷하게 그린다.
+   *
+   * 전에 부드럽게 하려고 해상도를 1.5배로 낮췄더니 글자와 지형이 눈에 띄게
+   * 뭉개졌다. 화질을 상시로 깎는 건 대가가 너무 크다. 대신 움직이는 동안에만
+   * 잠깐 낮추고(움직이는 화면에서는 안 보인다) 손을 떼면 바로 되돌린다.
+   * 아래 easeWhileMoving() 이 그 전환을 맡는다. */
+  viewer.resolutionScale = SHARP_SCALE;
+  scene.globe.maximumScreenSpaceError = LOW_POWER ? 2.2 : 1.5; // 클수록 타일 적게 = 가볍다
   scene.globe.preloadSiblings = !LOW_POWER;                  // 주변 타일 미리 받기
   if (scene.postProcessStages.fxaa) scene.postProcessStages.fxaa.enabled = !LOW_POWER;
 
@@ -136,49 +142,54 @@ async function init() {
 
 /* 돌리거나 이동할 때 끊기던 것을 없앤다.
  *
- * 도시 레이어만 엔티티가 7천 개가 넘는데, 라벨은 글자를 그리고 서로 겹치는지
- * 까지 매 프레임 따져야 해서 가장 비싸다. 움직이는 동안에는 어차피 읽지
- * 못하므로, 무거운 레이어를 잠깐 쉬게 하고 손을 떼면 되살린다.
- * 라벨을 하나씩 끄는 방식은 7천 번을 돌아야 해서 그 자체가 버벅임을 만든다.
- * 레이어 표시 플래그 하나만 건드린다.
+ * 손을 대고 있는 동안에만 무게를 덜고, 놓으면 원래 화질로 돌아온다.
+ *  - 도시 레이어(엔티티 7천 개 이상)를 잠깐 쉬게 한다. 라벨은 글자를 그리고
+ *    겹침까지 매 프레임 따져 가장 비싼데, 움직이는 중엔 어차피 못 읽는다.
+ *    라벨을 하나씩 끄면 7천 번을 돌아야 해서 그 자체로 버벅인다. 레이어
+ *    표시 플래그 하나만 건드린다.
+ *  - 렌더 배율을 잠깐 낮춘다. 움직이는 화면에서는 티가 안 난다.
+ *
+ * 신호는 카메라 이벤트가 아니라 손가락/마우스 조작에서 받는다. 카메라
+ * 이벤트로 하면 해상도를 바꾸는 순간 화면 크기가 변해 카메라가 또 움직인
+ * 것으로 잡히고, 되돌리기가 계속 취소돼 저화질에 갇힌다(실제로 그랬다).
  */
 const HEAVY_ENTITIES = 2000;
-const SETTLE_MS = 260;   // 이 시간 동안 새 움직임이 없어야 '멈췄다'로 본다
+const SETTLE_MS = 420;   // 손을 뗀 뒤 관성이 잦아들 때까지
 
 function easeWhileMoving(viewer, layers) {
   const heavy = layers.filter((L) => (L.ds?.entities?.values?.length || 0) >= HEAVY_ENTITIES);
-  if (!heavy.length) return;
-
   const scene = viewer.scene;
   const baseError = scene.globe.maximumScreenSpaceError;
-  let paused = null;
+  let hidden = null;
   let settleTimer = 0;
 
-  // Cesium 은 한 번의 드래그를 moveStart/moveEnd 수십 쌍으로 쪼개서 알린다.
-  // 그대로 받으면 껐다 켜기를 반복해 오히려 더 끊긴다. 복귀를 잠깐 미뤄
-  // 연속된 움직임을 하나로 묶는다.
-  const pause = () => {
+  const lighten = () => {
     clearTimeout(settleTimer);
-    if (paused) return;
-    paused = heavy.filter((L) => L.ds.show);
-    if (!paused.length) { paused = null; return; }
-    paused.forEach((L) => { L.ds.show = false; });
-    scene.globe.maximumScreenSpaceError = baseError * 1.6;  // 움직일 땐 타일도 성글게
+    if (hidden) return;
+    hidden = heavy.filter((L) => L.ds.show);
+    hidden.forEach((L) => { L.ds.show = false; });
+    scene.globe.maximumScreenSpaceError = baseError * 1.6;  // 타일도 성글게
+    viewer.resolutionScale = MOVING_SCALE;
   };
 
-  const resume = () => {
+  const restore = () => {
     clearTimeout(settleTimer);
     settleTimer = setTimeout(() => {
-      if (!paused) return;
-      paused.forEach((L) => { L.ds.show = true; });
-      paused = null;
+      if (!hidden) return;
+      hidden.forEach((L) => { L.ds.show = true; });
+      hidden = null;
       scene.globe.maximumScreenSpaceError = baseError;
+      viewer.resolutionScale = SHARP_SCALE;
       scene.requestRender();
     }, SETTLE_MS);
   };
 
-  viewer.camera.moveStart.addEventListener(pause);
-  viewer.camera.moveEnd.addEventListener(resume);
+  const canvas = scene.canvas;
+  canvas.addEventListener('pointerdown', lighten, { passive: true });
+  canvas.addEventListener('wheel', () => { lighten(); restore(); }, { passive: true });
+  // 손을 뗀 곳이 캔버스 밖일 수도 있으므로 창 전체에서 받는다
+  window.addEventListener('pointerup', restore, { passive: true });
+  window.addEventListener('pointercancel', restore, { passive: true });
 }
 
 /* requestRenderMode 를 켜면 카메라 이동·타일 로딩은 Cesium 이 알아서 다시
