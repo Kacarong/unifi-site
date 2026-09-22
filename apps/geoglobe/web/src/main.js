@@ -86,10 +86,20 @@ async function init() {
   scene.globe.preloadSiblings = !LOW_POWER;                  // 주변 타일 미리 받기
   if (scene.postProcessStages.fxaa) scene.postProcessStages.fxaa.enabled = !LOW_POWER;
 
-  // 대기 표현은 예쁘지만 매 프레임 추가 셰이딩이 든다
+  /* 지구처럼 보이게 하는 것들.
+   *
+   * 앞서 성능 때문에 대기 표현을 전부 껐더니 위성 사진만 덩그러니 남아
+   * 밋밋하고 조잡해 보였다. 지구 가장자리의 푸른 띠(skyAtmosphere)는 화면
+   * 테두리만 칠하는 것이라 값이 싸면서 "지구답다"는 인상을 거의 다 만든다.
+   * 지면 전체에 얹는 groundAtmosphere 와 원거리 안개는 비싸므로 PC 에서만. */
+  scene.skyAtmosphere.show = true;
   scene.globe.showGroundAtmosphere = !LOW_POWER;
-  scene.skyAtmosphere.show = !LOW_POWER;
   scene.fog.enabled = !LOW_POWER;
+
+  // 타일이 오기 전 흰 바탕이 번쩍이지 않도록 바다색을 깔아 둔다
+  scene.globe.baseColor = Cesium.Color.fromCssColorString('#0d2036');
+  // 사진 대비를 살짝 올려 위성 영상이 탁해 보이지 않게
+  scene.globe.atmosphereBrightnessShift = 0.05;
 
   // ion 토큰이 있을 때만 3D 지형 사용
   if (ionToken) {

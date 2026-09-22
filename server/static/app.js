@@ -6,6 +6,14 @@ const STATUS_LABEL = {
   desktop_only: 'PC 전용',
 };
 
+// 카드 겉면에 한 줄로 보여 줄 "지금 못 쓰는 이유"
+const WHY_BY_STATUS = {
+  desktop_only: '🔒 휴대폰에서는 쓸 수 없습니다. PC에서 열어 주세요.',
+  needs_build: '⚙️ 프론트엔드 빌드가 필요합니다.',
+  error: '⚠️ 앱을 불러오지 못했습니다.',
+  disabled: '⏸️ 꺼져 있는 앱입니다.',
+};
+
 const NOTE_BY_STATUS = {
   needs_build: '프론트엔드가 아직 빌드되지 않았습니다. `python scripts/build.py <id>` 를 실행하세요.',
   error: '앱 로드 중 오류가 났습니다. 서버 로그를 확인하세요.',
@@ -47,6 +55,12 @@ function card(app) {
   if (tagline) titles.append(el('p', 'card-tagline', tagline));
   head.append(titles);
   node.append(head);
+
+  // 못 쓰는 카드는 이유를 겉면에 바로 적는다. 흐릿하기만 하면
+  // "왜 안 되지" 하고 눌러 보게 된다.
+  if (!open && WHY_BY_STATUS[app.status]) {
+    node.append(el('p', 'card-why', WHY_BY_STATUS[app.status]));
+  }
 
   const foot = el('div', 'card-foot');
   foot.append(el('span', `badge ${app.status}`, STATUS_LABEL[app.status] || app.status));

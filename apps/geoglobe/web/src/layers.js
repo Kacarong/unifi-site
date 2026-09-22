@@ -2,6 +2,29 @@ import * as Cesium from 'cesium';
 
 const DATA = './data';
 
+/* 색·굵기를 한곳에 모은다.
+ *
+ * 처음엔 형광에 가까운 노랑·주황에 라벨마다 3px 검은 테두리를 둘렀더니,
+ * 위성 사진 위에서 선과 글자가 먼저 튀어 지도가 조잡해 보였다. 구글 어스처럼
+ * 사진이 주인공이 되도록 선은 가늘고 반투명하게, 글자 테두리는 그림자
+ * 정도로만 남긴다. 레이어를 구분하는 색 성격은 유지하되 채도만 낮춘다.
+ */
+export const PALETTE = {
+  border: '#e6d7a8',      // 국경 — 형광 노랑 대신 옅은 모래빛
+  admin: '#a9c6dd',       // 행정경계
+  city: '#fff3dc',        // 도시 점 — 거의 흰색
+  water: '#8fbce0',       // 강·호수·해협
+  disputed: '#e08a92',
+  plate: '#d99a6c',
+  region: '#dcc9a3',
+  marine: '#a8c6e4',
+  wind: '#8fd3e8',
+};
+
+// 라벨은 검은 테두리를 얇게 깔아 사진 위에서 읽히게만 한다(그림자 역할)
+const LABEL_HALO = Cesium.Color.BLACK.withAlpha(0.72);
+const LABEL_HALO_W = 2;
+
 // 언어별 이름 선택 헬퍼
 export function pick(props, lang, fields) {
   for (const base of fields) {
@@ -68,6 +91,8 @@ function entityCenter(e) {
 
 // 도시 중요도(SCALERANK 0~10)별 표시 거리(m)
 const CITY_FAR = [4.2e7, 3.0e7, 2.0e7, 1.2e7, 7.0e6, 4.5e6, 2.8e6, 1.7e6, 1.0e6, 6.5e5, 4.0e5];
+// 도시 이름은 점이 보이는 거리의 이만큼 안쪽으로 들어와야 나타난다
+const CITY_LABEL_RATIO = 0.35;
 function cityFar(scalerank) {
   const r = Number.isFinite(scalerank) ? Math.round(scalerank) : 8;
   return CITY_FAR[clamp(r, 0, 10)];
@@ -96,15 +121,15 @@ export async function buildLayers(viewer, ctx, onStep) {
   // 1) 국경 (국가 경계) — 라벨 지원
   {
     const ds = await loadGeo(viewer, `${DATA}/countries.geojson`, {
-      stroke: Cesium.Color.fromCssColorString('#ffd34d'),
-      fill: Cesium.Color.TRANSPARENT, strokeWidth: 2, defaultOn: true,
+      stroke: Cesium.Color.fromCssColorString(PALETTE.border),
+      fill: Cesium.Color.TRANSPARENT, strokeWidth: 1, defaultOn: true,
     });
     for (const e of ds.entities.values) {
       const p = propsToObj(e);
       e._props = p;
       if (e.polygon) {
         e.polygon.outline = true;
-        e.polygon.outlineColor = Cesium.Color.fromCssColorString('#ffd34d');
+        e.polygon.outlineColor = Cesium.Color.fromCssColorString(PALETTE.border);
         e.polygon.material = Cesium.Color.TRANSPARENT;
         e.polygon.arcType = Cesium.ArcType.GEODESIC;
       }
@@ -114,7 +139,7 @@ export async function buildLayers(viewer, ctx, onStep) {
           text: pick(p, ctx.lang, ['NAME', 'ADMIN']),
           font: '600 14px "Noto Sans KR", sans-serif',
           fillColor: Cesium.Color.WHITE,
-          outlineColor: Cesium.Color.BLACK, outlineWidth: 3,
+          outlineColor: LABEL_HALO, outlineWidth: LABEL_HALO_W,
           style: Cesium.LabelStyle.FILL_AND_OUTLINE,
           scaleByDistance: nfs(1.5e6, 1.1, 2.0e7, 0.5),
           translucencyByDistance: nfs(2.0e7, 1.0, 4.0e7, 0.0),
@@ -123,7 +148,7 @@ export async function buildLayers(viewer, ctx, onStep) {
       }
     }
     register({
-      id: 'borders', label: '국경 (국가)', color: '#ffd34d', defaultOn: true, hasLabel: true,
+      id: 'borders', label: '국경 (국가)', color: PALETTE.border, defaultOn: true, hasLabel: true,
       labelFields: ['NAME', 'ADMIN'], ds,
     });
   }
@@ -131,7 +156,7 @@ export async function buildLayers(viewer, ctx, onStep) {
   // 2) 행정경계 (주/도)
   {
     const ds = await loadGeo(viewer, `${DATA}/admin1.geojson`, {
-      stroke: Cesium.Color.fromCssColorString('#7fd1ff').withAlpha(0.8),
+      stroke: Cesium.Color.fromCssColorString(PALETTE.admin).withAlpha(0.8),
       fill: Cesium.Color.TRANSPARENT, strokeWidth: 1, defaultOn: false,
     });
     for (const e of ds.entities.values) {
@@ -139,7 +164,7 @@ export async function buildLayers(viewer, ctx, onStep) {
       e._props = p;
       if (e.polygon) {
         e.polygon.outline = true;
-        e.polygon.outlineColor = Cesium.Color.fromCssColorString('#7fd1ff').withAlpha(0.7);
+        e.polygon.outlineColor = Cesium.Color.fromCssColorString(PALETTE.admin).withAlpha(0.7);
         e.polygon.material = Cesium.Color.TRANSPARENT;
       }
       const lon = Number(p.longitude), lat = Number(p.latitude);
@@ -148,25 +173,25 @@ export async function buildLayers(viewer, ctx, onStep) {
         e.label = new Cesium.LabelGraphics({
           text: pick(p, ctx.lang, ['name', 'NAME']),
           font: '500 12px "Noto Sans KR", sans-serif',
-          fillColor: Cesium.Color.fromCssColorString('#cfeaff'),
-          outlineColor: Cesium.Color.BLACK, outlineWidth: 3,
+          fillColor: Cesium.Color.fromCssColorString(PALETTE.admin),
+          outlineColor: LABEL_HALO, outlineWidth: LABEL_HALO_W,
           style: Cesium.LabelStyle.FILL_AND_OUTLINE,
           distanceDisplayCondition: ddc(7.0e6),
           scaleByDistance: nfs(1.0e6, 1.0, 7.0e6, 0.5),
         });
       }
     }
-    register({ id: 'admin1', label: '행정경계 (주/도)', color: '#7fd1ff', defaultOn: false, hasLabel: true, labelFields: ['name', 'NAME'], ds });
+    register({ id: 'admin1', label: '행정경계 (주/도)', color: PALETTE.admin, defaultOn: false, hasLabel: true, labelFields: ['name', 'NAME'], ds });
   }
 
   // 3) 분쟁지역
   {
     const ds = await loadGeo(viewer, `${DATA}/disputed.geojson`, {
-      stroke: Cesium.Color.fromCssColorString('#ff5d6c'),
-      fill: Cesium.Color.fromCssColorString('#ff5d6c').withAlpha(0.28),
+      stroke: Cesium.Color.fromCssColorString(PALETTE.disputed),
+      fill: Cesium.Color.fromCssColorString(PALETTE.disputed).withAlpha(0.28),
       strokeWidth: 2, defaultOn: false,
     });
-    register({ id: 'disputed', label: '분쟁지역', color: '#ff5d6c', defaultOn: false, ds });
+    register({ id: 'disputed', label: '분쟁지역', color: PALETTE.disputed, defaultOn: false, ds });
   }
 
   // 4) 도시 — 7천여 개(중요도별 거리 표시로 밀집 방지)
@@ -179,23 +204,26 @@ export async function buildLayers(viewer, ctx, onStep) {
       const rank = Number.isFinite(p.SCALERANK) ? p.SCALERANK : 8;
       e.billboard = undefined;
       e.point = new Cesium.PointGraphics({
-        pixelSize: rank <= 2 ? 7 : rank <= 5 ? 5 : 4,
-        color: Cesium.Color.fromCssColorString('#ffb454'),
-        outlineColor: Cesium.Color.BLACK, outlineWidth: 1,
+        pixelSize: rank <= 2 ? 5 : rank <= 5 ? 4 : 3,
+        color: Cesium.Color.fromCssColorString(PALETTE.city),
+        outlineColor: Cesium.Color.BLACK.withAlpha(0.55), outlineWidth: 1,
         distanceDisplayCondition: ddc(far),
       });
       e.label = new Cesium.LabelGraphics({
         text: pick(p, ctx.lang, ['NAME']),
         font: '500 13px "Noto Sans KR", sans-serif',
-        fillColor: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 3,
+        fillColor: Cesium.Color.WHITE, outlineColor: LABEL_HALO, outlineWidth: LABEL_HALO_W,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         pixelOffset: new Cesium.Cartesian2(7, 0),
         horizontalOrigin: Cesium.HorizontalOrigin.LEFT,
-        distanceDisplayCondition: ddc(far),
-        scaleByDistance: nfs(far * 0.25, 1.05, far, 0.5),
+        // 이름은 점보다 늦게 나타난다. 점과 같은 거리에서 함께 띄우면
+        // 지구 전체를 볼 때 글자끼리 겹쳐 지도를 덮어 버린다.
+        // 멀리서는 위치(점)만, 가까이 가야 이름까지 보인다.
+        distanceDisplayCondition: ddc(far * CITY_LABEL_RATIO),
+        scaleByDistance: nfs(far * 0.2, 1.05, far * CITY_LABEL_RATIO, 0.55),
       });
     }
-    register({ id: 'cities', label: '도시 (7천+)', color: '#ffb454', defaultOn: true, hasLabel: true, labelFields: ['NAME'], ds });
+    register({ id: 'cities', label: '도시 (7천+)', color: PALETTE.city, defaultOn: true, hasLabel: true, labelFields: ['NAME'], ds });
   }
 
   // 5) 해협 · 운하 (커스텀)
@@ -208,25 +236,25 @@ export async function buildLayers(viewer, ctx, onStep) {
       e.billboard = undefined;
       e.point = new Cesium.PointGraphics({
         pixelSize: 8,
-        color: isCanal ? Cesium.Color.fromCssColorString('#24d3a5') : Cesium.Color.fromCssColorString('#4f8cff'),
+        color: isCanal ? Cesium.Color.fromCssColorString(PALETTE.water) : Cesium.Color.fromCssColorString(PALETTE.water),
         outlineColor: Cesium.Color.WHITE, outlineWidth: 1.5,
       });
       e.label = new Cesium.LabelGraphics({
         text: pick(p, ctx.lang, ['name']),
         font: '600 13px "Noto Sans KR", sans-serif',
-        fillColor: Cesium.Color.fromCssColorString('#cfe4ff'),
-        outlineColor: Cesium.Color.BLACK, outlineWidth: 3,
+        fillColor: Cesium.Color.fromCssColorString(PALETTE.water),
+        outlineColor: LABEL_HALO, outlineWidth: LABEL_HALO_W,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         pixelOffset: new Cesium.Cartesian2(0, -14),
       });
     }
-    register({ id: 'straits', label: '해협 · 운하', color: '#4f8cff', defaultOn: false, hasLabel: true, labelFields: ['name'], ds });
+    register({ id: 'straits', label: '해협 · 운하', color: PALETTE.water, defaultOn: false, hasLabel: true, labelFields: ['name'], ds });
   }
 
   // 6) 강 — 라벨 + 검색
   {
     const ds = await loadGeo(viewer, `${DATA}/rivers.geojson`, {
-      stroke: Cesium.Color.fromCssColorString('#5db6ff'), strokeWidth: 2, defaultOn: false,
+      stroke: Cesium.Color.fromCssColorString(PALETTE.water), strokeWidth: 2, defaultOn: false,
     });
     for (const e of ds.entities.values) {
       const p = propsToObj(e);
@@ -237,22 +265,22 @@ export async function buildLayers(viewer, ctx, onStep) {
         e.label = new Cesium.LabelGraphics({
           text: pick(p, ctx.lang, ['name']),
           font: 'italic 500 13px "Noto Sans KR", sans-serif',
-          fillColor: Cesium.Color.fromCssColorString('#8fd0ff'),
-          outlineColor: Cesium.Color.BLACK, outlineWidth: 3,
+          fillColor: Cesium.Color.fromCssColorString(PALETTE.water),
+          outlineColor: LABEL_HALO, outlineWidth: LABEL_HALO_W,
           style: Cesium.LabelStyle.FILL_AND_OUTLINE,
           distanceDisplayCondition: ddc(1.2e7),
           scaleByDistance: nfs(1.0e6, 1.05, 1.2e7, 0.5),
         });
       }
     }
-    register({ id: 'rivers', label: '주요 강', color: '#5db6ff', defaultOn: false, hasLabel: true, labelFields: ['name'], ds });
+    register({ id: 'rivers', label: '주요 강', color: PALETTE.water, defaultOn: false, hasLabel: true, labelFields: ['name'], ds });
   }
 
   // 7) 호수 — 라벨 + 검색
   {
     const ds = await loadGeo(viewer, `${DATA}/lakes.geojson`, {
-      stroke: Cesium.Color.fromCssColorString('#5db6ff'),
-      fill: Cesium.Color.fromCssColorString('#2a6fbf').withAlpha(0.55),
+      stroke: Cesium.Color.fromCssColorString(PALETTE.water),
+      fill: Cesium.Color.fromCssColorString(PALETTE.water).withAlpha(0.35),
       strokeWidth: 1, defaultOn: false,
     });
     for (const e of ds.entities.values) {
@@ -264,23 +292,23 @@ export async function buildLayers(viewer, ctx, onStep) {
         e.label = new Cesium.LabelGraphics({
           text: pick(p, ctx.lang, ['name']),
           font: '500 13px "Noto Sans KR", sans-serif',
-          fillColor: Cesium.Color.fromCssColorString('#bfe4ff'),
-          outlineColor: Cesium.Color.BLACK, outlineWidth: 3,
+          fillColor: Cesium.Color.fromCssColorString(PALETTE.marine),
+          outlineColor: LABEL_HALO, outlineWidth: LABEL_HALO_W,
           style: Cesium.LabelStyle.FILL_AND_OUTLINE,
           distanceDisplayCondition: ddc(1.5e7),
           scaleByDistance: nfs(1.0e6, 1.05, 1.5e7, 0.5),
         });
       }
     }
-    register({ id: 'lakes', label: '주요 호수', color: '#5db6ff', defaultOn: false, hasLabel: true, labelFields: ['name'], ds });
+    register({ id: 'lakes', label: '주요 호수', color: PALETTE.water, defaultOn: false, hasLabel: true, labelFields: ['name'], ds });
   }
 
   // 8) 판의 경계
   {
     const ds = await loadGeo(viewer, `${DATA}/plates.geojson`, {
-      stroke: Cesium.Color.fromCssColorString('#ff8c42'), strokeWidth: 3, defaultOn: false,
+      stroke: Cesium.Color.fromCssColorString(PALETTE.plate), strokeWidth: 3, defaultOn: false,
     });
-    register({ id: 'plates', label: '판의 경계', color: '#ff8c42', defaultOn: false, ds });
+    register({ id: 'plates', label: '판의 경계', color: PALETTE.plate, defaultOn: false, ds });
   }
 
   // 8b) 지형·지역 (고원/사막/산맥/반도/평원 등) — 라벨
@@ -293,21 +321,21 @@ export async function buildLayers(viewer, ctx, onStep) {
       e.billboard = undefined;
       e.point = new Cesium.PointGraphics({
         pixelSize: 4,
-        color: Cesium.Color.fromCssColorString('#e8c07d').withAlpha(0.9),
-        outlineColor: Cesium.Color.BLACK, outlineWidth: 1,
+        color: Cesium.Color.fromCssColorString(PALETTE.region).withAlpha(0.9),
+        outlineColor: Cesium.Color.BLACK.withAlpha(0.55), outlineWidth: 1,
         distanceDisplayCondition: ddc(far),
       });
       e.label = new Cesium.LabelGraphics({
         text: pick(p, ctx.lang, ['NAME', 'name']),
         font: 'italic 600 13px "Noto Sans KR", sans-serif',
-        fillColor: Cesium.Color.fromCssColorString('#ffe6b0'),
-        outlineColor: Cesium.Color.BLACK, outlineWidth: 3,
+        fillColor: Cesium.Color.fromCssColorString(PALETTE.region),
+        outlineColor: LABEL_HALO, outlineWidth: LABEL_HALO_W,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         distanceDisplayCondition: ddc(far),
         scaleByDistance: nfs(far * 0.25, 1.05, far, 0.5),
       });
     }
-    register({ id: 'regions', label: '지형·지역 (고원/사막/산맥)', color: '#e8c07d', defaultOn: false, hasLabel: true, labelFields: ['NAME', 'name'], ds });
+    register({ id: 'regions', label: '지형·지역 (고원/사막/산맥)', color: PALETTE.region, defaultOn: false, hasLabel: true, labelFields: ['NAME', 'name'], ds });
   }
 
   // 8c) 바다·해양 (대양/바다/만/해협) — 라벨
@@ -323,14 +351,14 @@ export async function buildLayers(viewer, ctx, onStep) {
       e.label = new Cesium.LabelGraphics({
         text: pick(p, ctx.lang, ['name', 'NAME']),
         font: 'italic 500 13px "Noto Sans KR", sans-serif',
-        fillColor: Cesium.Color.fromCssColorString('#9fd0ff'),
-        outlineColor: Cesium.Color.BLACK, outlineWidth: 3,
+        fillColor: Cesium.Color.fromCssColorString(PALETTE.marine),
+        outlineColor: LABEL_HALO, outlineWidth: LABEL_HALO_W,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         distanceDisplayCondition: ddc(far),
         scaleByDistance: nfs(far * 0.25, 1.1, far, 0.5),
       });
     }
-    register({ id: 'marine', label: '바다·해양', color: '#9fd0ff', defaultOn: false, hasLabel: true, labelFields: ['name', 'NAME'], ds });
+    register({ id: 'marine', label: '바다·해양', color: PALETTE.marine, defaultOn: false, hasLabel: true, labelFields: ['name', 'NAME'], ds });
   }
 
   // 9) 위도·경도 격자 (그래티큘) — 이미지 레이어
@@ -355,8 +383,8 @@ export async function buildLayers(viewer, ctx, onStep) {
     const bands = [
       { lat: 15, latEnd: 8, dir: 'W', color: '#ffa94d', name: '북동 무역풍' },
       { lat: -15, latEnd: -8, dir: 'W', color: '#ffa94d', name: '남동 무역풍' },
-      { lat: 45, latEnd: 48, dir: 'E', color: '#4dd2ff', name: '편서풍(북)' },
-      { lat: -45, latEnd: -48, dir: 'E', color: '#4dd2ff', name: '편서풍(남)' },
+      { lat: 45, latEnd: 48, dir: 'E', color: PALETTE.wind, name: '편서풍(북)' },
+      { lat: -45, latEnd: -48, dir: 'E', color: PALETTE.wind, name: '편서풍(남)' },
       { lat: 72, latEnd: 68, dir: 'W', color: '#c792ff', name: '극동풍(북)' },
       { lat: -72, latEnd: -68, dir: 'W', color: '#c792ff', name: '극동풍(남)' },
     ];
@@ -378,7 +406,7 @@ export async function buildLayers(viewer, ctx, onStep) {
     }
     ds.show = false;
     await viewer.dataSources.add(ds);
-    register({ id: 'winds', label: '편서풍·무역풍', color: '#4dd2ff', defaultOn: false, ds });
+    register({ id: 'winds', label: '편서풍·무역풍', color: PALETTE.wind, defaultOn: false, ds });
   }
 
   // 공통 show/label 컨트롤 부여
