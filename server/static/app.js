@@ -3,11 +3,13 @@ const STATUS_LABEL = {
   needs_build: '빌드 필요',
   error: '오류',
   disabled: '꺼짐',
+  desktop_only: 'PC 전용',
 };
 
 const NOTE_BY_STATUS = {
   needs_build: '프론트엔드가 아직 빌드되지 않았습니다. `python scripts/build.py <id>` 를 실행하세요.',
   error: '앱 로드 중 오류가 났습니다. 서버 로그를 확인하세요.',
+  desktop_only: '이 앱은 PC에서만 쓸 수 있습니다. 로컬 PC 프로그램이 함께 있어야 동작합니다.',
 };
 
 function el(tag, cls, text) {

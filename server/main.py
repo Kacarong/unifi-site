@@ -140,6 +140,57 @@ def logout() -> JSONResponse:
     return res
 
 
+# 휴대폰·태블릿 판별. 포털 표시와 직접 접속 차단이 어긋나지 않도록
+# 판단은 서버 한 곳에서만 한다.
+_MOBILE_UA = re.compile(
+    r"Android|iPhone|iPod|iPad|Windows Phone|IEMobile|Opera Mini|Mobile Safari",
+    re.IGNORECASE,
+)
+
+
+def is_mobile(request: Request) -> bool:
+    return bool(_MOBILE_UA.search(request.headers.get("user-agent", "")))
+
+
+DESKTOP_ONLY_PAGE = """<!doctype html><html lang="ko"><head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#070b16" /><meta name="color-scheme" content="dark" />
+<title>{name} · PC 전용</title>
+<link rel="stylesheet" href="/ui.css" />
+<style>
+  .only {{ min-height: 100dvh; display: grid; place-items: center; padding: 24px; }}
+  .only .panel {{ max-width: 380px; text-align: center; display: grid; gap: 14px; }}
+  .only .big {{ font-size: 40px; }}
+</style></head><body>
+<header class="topbar"><a class="back" href="/">← unifi</a></header>
+<div class="only"><div class="panel">
+  <div class="big">{icon}</div>
+  <h1>{name}</h1>
+  <p class="muted">이 앱은 PC에서만 쓸 수 있습니다.<br />{reason}</p>
+  <a class="btn primary" href="/">다른 앱 보기</a>
+</div></div></body></html>"""
+
+
+@app.middleware("http")
+async def _desktop_only_gate(request: Request, call_next):
+    """PC 전용 앱을 휴대폰으로 직접 열면 안내 화면을 보여 준다."""
+    path = request.url.path
+    if path.startswith("/apps/") and is_mobile(request):
+        app_id = path.split("/")[2] if len(path.split("/")) > 2 else ""
+        spec = next((s for s in APPS if s.id == app_id), None)
+        if spec and spec.desktop_only:
+            return HTMLResponse(
+                DESKTOP_ONLY_PAGE.format(
+                    name=spec.name,
+                    icon=spec.icon,
+                    reason=spec.notes or "로컬 PC 프로그램이 함께 있어야 동작합니다.",
+                ),
+                status_code=200,
+            )
+    return await call_next(request)
+
+
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon() -> FileResponse:
     """브라우저는 <link rel=icon> 이 있어도 /favicon.ico 를 찾는 경우가 있다.
@@ -148,8 +199,17 @@ def favicon() -> FileResponse:
 
 
 @app.get("/api/_apps")
-def list_apps() -> JSONResponse:
-    return JSONResponse([s.to_json() for s in APPS])
+def list_apps(request: Request) -> JSONResponse:
+    mobile = is_mobile(request)
+    out = []
+    for spec in APPS:
+        item = spec.to_json()
+        if mobile and spec.desktop_only:
+            # 휴대폰에서는 눌러도 못 쓰는 앱이니 처음부터 그렇게 보여 준다
+            item["status"] = "desktop_only"
+            item["url"] = None
+        out.append(item)
+    return JSONResponse(out)
 
 
 @app.get("/api/_health")

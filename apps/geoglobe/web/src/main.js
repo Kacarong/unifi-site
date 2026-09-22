@@ -74,8 +74,14 @@ async function init() {
 
   const scene = viewer.scene;
 
-  // 화질 — 저사양에선 한 단계씩 낮춘다
-  viewer.resolutionScale = LOW_POWER ? 1 : Math.min(window.devicePixelRatio || 1, 2);
+  // 화질 — 저사양에선 한 단계씩 낮춘다.
+  //
+  // useBrowserRecommendedResolution:false 라서 Cesium 은 기기 픽셀비(폰은 보통 3)
+  // 그대로 그린다. resolutionScale 1 은 "그 위에 1배"라 실제로는 3배 해상도,
+  // 즉 픽셀이 9배다. 이게 폰에서 끊기는 가장 큰 원인이었다. 1.5배로 낮춘다
+  // (픽셀 1/4). 글자는 여전히 또렷하고 프레임은 크게 벌어진다.
+  const dpr = window.devicePixelRatio || 1;
+  viewer.resolutionScale = LOW_POWER ? Math.min(1, 1.5 / dpr) : Math.min(dpr, 2);
   scene.globe.maximumScreenSpaceError = LOW_POWER ? 3 : 1.5; // 클수록 타일 적게 = 가볍다
   scene.globe.preloadSiblings = !LOW_POWER;                  // 주변 타일 미리 받기
   if (scene.postProcessStages.fxaa) scene.postProcessStages.fxaa.enabled = !LOW_POWER;
@@ -113,8 +119,56 @@ async function init() {
   window.Cesium = Cesium;
   window.viewer = viewer; // 콘솔에서 카메라 제어/디버깅용
   installRedrawSafetyNet(viewer);
+  if (LOW_POWER) easeWhileMoving(viewer, layers);
   viewer.scene.requestRender();
   loading.done();
+}
+
+/* 돌리거나 이동할 때 끊기던 것을 없앤다.
+ *
+ * 도시 레이어만 엔티티가 7천 개가 넘는데, 라벨은 글자를 그리고 서로 겹치는지
+ * 까지 매 프레임 따져야 해서 가장 비싸다. 움직이는 동안에는 어차피 읽지
+ * 못하므로, 무거운 레이어를 잠깐 쉬게 하고 손을 떼면 되살린다.
+ * 라벨을 하나씩 끄는 방식은 7천 번을 돌아야 해서 그 자체가 버벅임을 만든다.
+ * 레이어 표시 플래그 하나만 건드린다.
+ */
+const HEAVY_ENTITIES = 2000;
+const SETTLE_MS = 260;   // 이 시간 동안 새 움직임이 없어야 '멈췄다'로 본다
+
+function easeWhileMoving(viewer, layers) {
+  const heavy = layers.filter((L) => (L.ds?.entities?.values?.length || 0) >= HEAVY_ENTITIES);
+  if (!heavy.length) return;
+
+  const scene = viewer.scene;
+  const baseError = scene.globe.maximumScreenSpaceError;
+  let paused = null;
+  let settleTimer = 0;
+
+  // Cesium 은 한 번의 드래그를 moveStart/moveEnd 수십 쌍으로 쪼개서 알린다.
+  // 그대로 받으면 껐다 켜기를 반복해 오히려 더 끊긴다. 복귀를 잠깐 미뤄
+  // 연속된 움직임을 하나로 묶는다.
+  const pause = () => {
+    clearTimeout(settleTimer);
+    if (paused) return;
+    paused = heavy.filter((L) => L.ds.show);
+    if (!paused.length) { paused = null; return; }
+    paused.forEach((L) => { L.ds.show = false; });
+    scene.globe.maximumScreenSpaceError = baseError * 1.6;  // 움직일 땐 타일도 성글게
+  };
+
+  const resume = () => {
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(() => {
+      if (!paused) return;
+      paused.forEach((L) => { L.ds.show = true; });
+      paused = null;
+      scene.globe.maximumScreenSpaceError = baseError;
+      scene.requestRender();
+    }, SETTLE_MS);
+  };
+
+  viewer.camera.moveStart.addEventListener(pause);
+  viewer.camera.moveEnd.addEventListener(resume);
 }
 
 /* requestRenderMode 를 켜면 카메라 이동·타일 로딩은 Cesium 이 알아서 다시

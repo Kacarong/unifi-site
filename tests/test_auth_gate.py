@@ -74,6 +74,28 @@ def run() -> None:
         "public, max-age=31536000, immutable",
     )
 
+    print("4-2) PC 전용 앱은 휴대폰에서 막힌다")
+    PHONE = {"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) "
+                           "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"}
+    PC = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                        "(KHTML, like Gecko) Chrome/130.0 Safari/537.36"}
+
+    def cgv(headers):
+        apps = client.get("/api/_apps", headers=headers).json()
+        return next(a for a in apps if a["id"] == "cgvmacro")
+
+    check("휴대폰에선 PC 전용 표시", cgv(PHONE)["status"], "desktop_only")
+    check("휴대폰에선 열 주소 없음", cgv(PHONE)["url"], None)
+    check("PC 에선 그대로 사용 가능", cgv(PC)["status"], "ready")
+    # 주소를 직접 열어도 막혀야 한다
+    phone_page = client.get("/apps/cgvmacro/", headers=PHONE)
+    check("휴대폰 직접 접속은 안내 화면", "PC에서만" in phone_page.text, True)
+    check("PC 직접 접속은 정상", client.get("/apps/cgvmacro/", headers=PC).status_code, 200)
+    check("PC 화면엔 안내문 없음", "PC에서만" in client.get("/apps/cgvmacro/", headers=PC).text, False)
+    # PC 전용이 아닌 앱은 휴대폰에서도 그대로
+    apps = client.get("/api/_apps", headers=PHONE).json()
+    check("다른 앱은 영향 없음", next(a for a in apps if a["id"] == "geoglobe")["status"], "ready")
+
     print("5) 쿠키 위조는 통하지 않는다")
     forged = TestClient(app, cookies={"unifi_auth": "99999999999.deadbeef"})
     check("위조 쿠키 401", forged.get("/api/_apps").status_code, 401)

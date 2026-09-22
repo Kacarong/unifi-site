@@ -114,6 +114,8 @@
 /* 아직 쓸 수 없는 앱은 흐리게. 링크가 없어 눌러도 아무 일이 없다 */
 .card-off { opacity: 0.62; }
 
+.badge.desktop_only { color: var(--sub); border-color: var(--line-strong); }
+
 /* ── 펼쳐지는 상세 ────────────────────────────────────────
  * height:auto 는 전환이 안 되므로, grid 행 크기를 0fr → 1fr 로 움직인다.
  * 내용 높이를 몰라도 자연스럽게 열리고 닫힌다. */

@@ -52,6 +52,9 @@ class AppSpec:
     # 별도 설치/실행이 필요할 때 포털에 띄울 안내
     notes: str = ""
     enabled: bool = True
+    # 휴대폰에서는 쓸 수 없는 앱 (로컬 PC 프로그램이 있어야 의미가 있는 경우 등).
+    # 포털에서 'PC 전용'으로 표시되고, 휴대폰으로 주소를 직접 열어도 막힌다.
+    desktop_only: bool = False
 
     # --- 런타임에 채워지는 값 ---
     dir: str = ""
@@ -94,6 +97,7 @@ class AppSpec:
             "description": self.description,
             "icon": self.icon,
             "accent": self.accent,
+            "desktop_only": self.desktop_only,
             "tags": self.tags,
             "status": self.status,
             "error": self.error,
