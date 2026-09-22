@@ -147,37 +147,76 @@ async function init() {
  * "인천광역시" 위에 "서울특별시" 가 포개져 둘 다 못 읽는 식이다. 구글 어스는
  * 겹치면 덜 중요한 이름을 지운다. 같은 방식으로, 가까이 붙은 이름들 중
  * 가장 중요한 하나만 남긴다. 점(위치)은 전부 그대로 둔다.
+ *
+ * 알려진 한계 — 레이어를 가로지르는 겹침은 막지 못한다.
+ * Cesium 의 겹침 정리는 DataSource 하나 안에서만 돈다(clustering 이
+ * DataSource 의 속성이다). 그래서 "헝가리"(국경 레이어) 위에 "부다페스트"
+ * (도시 레이어)가 포개지는 식의, 서로 다른 레이어 사이 겹침은 원리상 잡히지
+ * 않는다. 전 레이어를 한 DataSource 로 합치거나 겹침 정리를 직접 구현해야
+ * 하는데 얻는 것에 비해 대가가 크다. 남겨 둔다.
+ * (tools/label-audit.mjs 로 센 값: 유럽 확대 화면에서 남은 겹침 1쌍이 이 경우다)
  */
 function declutterLabels(viewer, layers) {
   const rankOf = (e) => {
     const r = e._props?.SCALERANK;
     return Number.isFinite(r) ? r : 99;
   };
+  const val = (prop) => prop?.getValue?.(Cesium.JulianDate.now());
+  // 이 라벨이 "얼마나 멀리서까지 보이도록" 설정됐는지. 대표를 고르는 기준이다.
+  const reachOf = (e) => val(e.label?.distanceDisplayCondition)?.far ?? Infinity;
 
   for (const L of layers) {
     if (!L.hasLabel) continue;
     const c = L.ds.clustering;
     c.enabled = true;
-    c.pixelRange = 58;        // 이 거리 안에 들어오면 겹친 것으로 본다
+    /* 겹쳤다고 볼 거리. 라벨 글상자가 아니라 "기준점 사이"의 화면 거리다.
+     *
+     * 한글 도시명이 60~80px 폭인데 이 값이 58 이라 글자는 겹치는데 묶이지
+     * 않는 것처럼 보였다. 그래서 90~120 으로 올려 봤지만, 글상자를 실제로
+     * 재서 세어 보니 겹치는 쌍은 58 에서도 이미 0 이었다(유럽 확대에서 1쌍만
+     * 남고 그건 위에 적은 레이어 간 겹침이라 이 값으로 못 고친다). 반대로
+     * 96 으로 올리면 지구 전체 뷰의 국가 이름이 13개에서 6개로 반토막 난다.
+     * 얻는 것 없이 이름만 잃으므로 58 을 유지한다. 눈에 보였던 겹침은
+     * 이 값 탓이 아니라 아래 거리 설정 누락 탓이었다. */
+    c.pixelRange = 58;
     c.minimumClusterSize = 2;
     c.clusterLabels = true;
     c.clusterPoints = false;  // 점은 전부 남긴다 — 위치 정보는 지우지 않는다
     c.clusterBillboards = false;
 
     c.clusterEvent.addEventListener((entities, cluster) => {
-      // 기본은 "N개" 풍선이다. 그 대신 대표 이름 하나를 보여 준다.
+      /* 기본은 "N개" 풍선이다. 그 대신 대표 이름 하나를 보여 준다.
+       * 대표는 "가장 멀리서까지 보이도록 설정된" 것을 먼저, 같으면 더 중요한
+       * (SCALERANK 낮은) 것을 고른다. 이 순서여야 대표를 세우는 것 때문에
+       * 원래 보였어야 할 이름이 사라지지 않는다. */
       let best = entities[0];
-      for (const e of entities) if (rankOf(e) < rankOf(best)) best = e;
+      for (const e of entities) {
+        const dr = reachOf(e) - reachOf(best);
+        if (dr > 0 || (dr === 0 && rankOf(e) < rankOf(best))) best = e;
+      }
       const label = best.label;
       cluster.label.show = true;
-      cluster.label.text = label.text?.getValue?.(Cesium.JulianDate.now()) ?? '';
-      cluster.label.font = label.font?.getValue?.() ?? '500 13px "Noto Sans KR", sans-serif';
-      cluster.label.fillColor = label.fillColor?.getValue?.() ?? Cesium.Color.WHITE;
-      cluster.label.outlineColor = label.outlineColor?.getValue?.() ?? Cesium.Color.BLACK;
-      cluster.label.outlineWidth = label.outlineWidth?.getValue?.() ?? 2;
+      cluster.label.text = val(label.text) ?? '';
+      cluster.label.font = val(label.font) ?? '500 13px "Noto Sans KR", sans-serif';
+      cluster.label.fillColor = val(label.fillColor) ?? Cesium.Color.WHITE;
+      cluster.label.outlineColor = val(label.outlineColor) ?? Cesium.Color.BLACK;
+      cluster.label.outlineWidth = val(label.outlineWidth) ?? 2;
       cluster.label.style = Cesium.LabelStyle.FILL_AND_OUTLINE;
-      cluster.label.pixelOffset = label.pixelOffset?.getValue?.() ?? new Cesium.Cartesian2(7, 0);
+      cluster.label.pixelOffset = val(label.pixelOffset) ?? new Cesium.Cartesian2(7, 0);
       cluster.label.horizontalOrigin = Cesium.HorizontalOrigin.LEFT;
+      /* 거리 설정을 반드시 같이 옮긴다.
+       *
+       * Cesium 은 클러스터를 그릴 때마다 대표 라벨을 "새로" 만든다
+       * (EntityCluster.addCluster → clusterLabelCollection.add()). 새 라벨은
+       * distanceDisplayCondition 도 scaleByDistance 도 없는 맨 상태로 show=true
+       * 가 된다. 게다가 클러스터 후보를 고르는 getScreenSpacePositions() 는
+       * label.show 만 보고 distanceDisplayCondition 은 보지 않는다. 그래서
+       * 거리로 숨겨 둔 라벨까지 클러스터링에 끼고, 대표로 뽑히는 순간 거리
+       * 조건이 사라진 라벨로 되살아났다. 여기서 옮겨 주지 않으면 레이어에
+       * 걸어 둔 거리 기준 숨김·축소가 전부 무효가 된다. */
+      cluster.label.distanceDisplayCondition = val(label.distanceDisplayCondition);
+      cluster.label.scaleByDistance = val(label.scaleByDistance);
+      cluster.label.translucencyByDistance = val(label.translucencyByDistance);
       cluster.billboard.show = false;
       cluster.point.show = false;
     });

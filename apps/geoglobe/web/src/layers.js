@@ -141,8 +141,17 @@ export async function buildLayers(viewer, ctx, onStep) {
           fillColor: Cesium.Color.WHITE,
           outlineColor: LABEL_HALO, outlineWidth: LABEL_HALO_W,
           style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          scaleByDistance: nfs(1.5e6, 1.0, 1.8e7, 0.42),
-          translucencyByDistance: nfs(1.6e7, 0.95, 3.0e7, 0.0),
+          /* 지구 전체 뷰에서 읽히는 유일한 이름이다.
+           *
+           * 전에는 멀어질수록 0.42배까지 줄이고 투명도도 같이 빼서, 초기
+           * 시점(약 2.1e7 m)에서 13px 글자가 5.5px·투명도 0.6 으로 찍혔다.
+           * 그때는 클러스터 대표 라벨이 이 설정을 못 받아 원래 크기로 떠서
+           * 문제가 드러나지 않았을 뿐이다. 도시 이름이 이 거리에서 모두
+           * 빠지는 지금은 국가 이름마저 안 보이면 이름 없는 지구가 된다.
+           * 멀리서도 읽을 수 있는 크기를 유지하고, 그보다 더 뒤로 빼야
+           * 사라지게 한다. */
+          scaleByDistance: nfs(1.5e6, 1.0, 2.6e7, 0.8),
+          translucencyByDistance: nfs(2.8e7, 0.95, 4.2e7, 0.0),
           disableDepthTestDistance: 0,
         });
       }
