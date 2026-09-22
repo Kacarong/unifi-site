@@ -135,9 +135,53 @@ async function init() {
   window.Cesium = Cesium;
   window.viewer = viewer; // 콘솔에서 카메라 제어/디버깅용
   installRedrawSafetyNet(viewer);
+  declutterLabels(viewer, layers);
   if (LOW_POWER) easeWhileMoving(viewer, layers);
   viewer.scene.requestRender();
   loading.done();
+}
+
+/* 이름이 서로 겹쳐 뭉개지던 것을 없앤다.
+ *
+ * 화면에 뜬 라벨을 세어 보니 한반도 확대 화면에서만 겹치는 쌍이 수만 개였다.
+ * "인천광역시" 위에 "서울특별시" 가 포개져 둘 다 못 읽는 식이다. 구글 어스는
+ * 겹치면 덜 중요한 이름을 지운다. 같은 방식으로, 가까이 붙은 이름들 중
+ * 가장 중요한 하나만 남긴다. 점(위치)은 전부 그대로 둔다.
+ */
+function declutterLabels(viewer, layers) {
+  const rankOf = (e) => {
+    const r = e._props?.SCALERANK;
+    return Number.isFinite(r) ? r : 99;
+  };
+
+  for (const L of layers) {
+    if (!L.hasLabel) continue;
+    const c = L.ds.clustering;
+    c.enabled = true;
+    c.pixelRange = 58;        // 이 거리 안에 들어오면 겹친 것으로 본다
+    c.minimumClusterSize = 2;
+    c.clusterLabels = true;
+    c.clusterPoints = false;  // 점은 전부 남긴다 — 위치 정보는 지우지 않는다
+    c.clusterBillboards = false;
+
+    c.clusterEvent.addEventListener((entities, cluster) => {
+      // 기본은 "N개" 풍선이다. 그 대신 대표 이름 하나를 보여 준다.
+      let best = entities[0];
+      for (const e of entities) if (rankOf(e) < rankOf(best)) best = e;
+      const label = best.label;
+      cluster.label.show = true;
+      cluster.label.text = label.text?.getValue?.(Cesium.JulianDate.now()) ?? '';
+      cluster.label.font = label.font?.getValue?.() ?? '500 13px "Noto Sans KR", sans-serif';
+      cluster.label.fillColor = label.fillColor?.getValue?.() ?? Cesium.Color.WHITE;
+      cluster.label.outlineColor = label.outlineColor?.getValue?.() ?? Cesium.Color.BLACK;
+      cluster.label.outlineWidth = label.outlineWidth?.getValue?.() ?? 2;
+      cluster.label.style = Cesium.LabelStyle.FILL_AND_OUTLINE;
+      cluster.label.pixelOffset = label.pixelOffset?.getValue?.() ?? new Cesium.Cartesian2(7, 0);
+      cluster.label.horizontalOrigin = Cesium.HorizontalOrigin.LEFT;
+      cluster.billboard.show = false;
+      cluster.point.show = false;
+    });
+  }
 }
 
 /* 돌리거나 이동할 때 끊기던 것을 없앤다.
