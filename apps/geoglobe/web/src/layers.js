@@ -10,7 +10,7 @@ const DATA = './data';
  * 정도로만 남긴다. 레이어를 구분하는 색 성격은 유지하되 채도만 낮춘다.
  */
 export const PALETTE = {
-  border: '#e6d7a8',      // 국경 — 형광 노랑 대신 옅은 모래빛
+  border: '#d8c995',      // 국경 — 위성 사진을 덮지 않는 낮은 채도의 모래빛
   admin: '#a9c6dd',       // 행정경계
   city: '#fff3dc',        // 도시 점 — 거의 흰색
   water: '#8fbce0',       // 강·호수·해협
@@ -22,8 +22,8 @@ export const PALETTE = {
 };
 
 // 라벨은 검은 테두리를 얇게 깔아 사진 위에서 읽히게만 한다(그림자 역할)
-const LABEL_HALO = Cesium.Color.BLACK.withAlpha(0.72);
-const LABEL_HALO_W = 2;
+const LABEL_HALO = Cesium.Color.BLACK.withAlpha(0.62);
+const LABEL_HALO_W = 1.6;
 
 // 언어별 이름 선택 헬퍼
 export function pick(props, lang, fields) {
@@ -92,7 +92,7 @@ function entityCenter(e) {
 // 도시 중요도(SCALERANK 0~10)별 표시 거리(m)
 const CITY_FAR = [4.2e7, 3.0e7, 2.0e7, 1.2e7, 7.0e6, 4.5e6, 2.8e6, 1.7e6, 1.0e6, 6.5e5, 4.0e5];
 // 도시 이름은 점이 보이는 거리의 이만큼 안쪽으로 들어와야 나타난다
-const CITY_LABEL_RATIO = 0.35;
+const CITY_LABEL_RATIO = 0.18;
 function cityFar(scalerank) {
   const r = Number.isFinite(scalerank) ? Math.round(scalerank) : 8;
   return CITY_FAR[clamp(r, 0, 10)];
@@ -121,15 +121,15 @@ export async function buildLayers(viewer, ctx, onStep) {
   // 1) 국경 (국가 경계) — 라벨 지원
   {
     const ds = await loadGeo(viewer, `${DATA}/countries.geojson`, {
-      stroke: Cesium.Color.fromCssColorString(PALETTE.border),
-      fill: Cesium.Color.TRANSPARENT, strokeWidth: 1, defaultOn: true,
+      stroke: Cesium.Color.fromCssColorString(PALETTE.border).withAlpha(0.72),
+      fill: Cesium.Color.TRANSPARENT, strokeWidth: 0.8, defaultOn: true,
     });
     for (const e of ds.entities.values) {
       const p = propsToObj(e);
       e._props = p;
       if (e.polygon) {
         e.polygon.outline = true;
-        e.polygon.outlineColor = Cesium.Color.fromCssColorString(PALETTE.border);
+        e.polygon.outlineColor = Cesium.Color.fromCssColorString(PALETTE.border).withAlpha(0.72);
         e.polygon.material = Cesium.Color.TRANSPARENT;
         e.polygon.arcType = Cesium.ArcType.GEODESIC;
       }
@@ -137,12 +137,12 @@ export async function buildLayers(viewer, ctx, onStep) {
         e.position = Cesium.Cartesian3.fromDegrees(Number(p.LABEL_X), Number(p.LABEL_Y));
         e.label = new Cesium.LabelGraphics({
           text: pick(p, ctx.lang, ['NAME', 'ADMIN']),
-          font: '600 14px "Noto Sans KR", sans-serif',
+          font: '600 13px "Noto Sans KR", sans-serif',
           fillColor: Cesium.Color.WHITE,
           outlineColor: LABEL_HALO, outlineWidth: LABEL_HALO_W,
           style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          scaleByDistance: nfs(1.5e6, 1.1, 2.0e7, 0.5),
-          translucencyByDistance: nfs(2.0e7, 1.0, 4.0e7, 0.0),
+          scaleByDistance: nfs(1.5e6, 1.0, 1.8e7, 0.42),
+          translucencyByDistance: nfs(1.6e7, 0.95, 3.0e7, 0.0),
           disableDepthTestDistance: 0,
         });
       }
@@ -204,14 +204,14 @@ export async function buildLayers(viewer, ctx, onStep) {
       const rank = Number.isFinite(p.SCALERANK) ? p.SCALERANK : 8;
       e.billboard = undefined;
       e.point = new Cesium.PointGraphics({
-        pixelSize: rank <= 2 ? 5 : rank <= 5 ? 4 : 3,
-        color: Cesium.Color.fromCssColorString(PALETTE.city),
-        outlineColor: Cesium.Color.BLACK.withAlpha(0.55), outlineWidth: 1,
+        pixelSize: rank <= 2 ? 4 : rank <= 5 ? 3.5 : 2.5,
+        color: Cesium.Color.fromCssColorString(PALETTE.city).withAlpha(rank <= 5 ? 0.92 : 0.72),
+        outlineColor: Cesium.Color.BLACK.withAlpha(0.45), outlineWidth: 0.8,
         distanceDisplayCondition: ddc(far),
       });
       e.label = new Cesium.LabelGraphics({
         text: pick(p, ctx.lang, ['NAME']),
-        font: '500 13px "Noto Sans KR", sans-serif',
+        font: '500 12px "Noto Sans KR", sans-serif',
         fillColor: Cesium.Color.WHITE, outlineColor: LABEL_HALO, outlineWidth: LABEL_HALO_W,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         pixelOffset: new Cesium.Cartesian2(7, 0),
@@ -220,7 +220,7 @@ export async function buildLayers(viewer, ctx, onStep) {
         // 지구 전체를 볼 때 글자끼리 겹쳐 지도를 덮어 버린다.
         // 멀리서는 위치(점)만, 가까이 가야 이름까지 보인다.
         distanceDisplayCondition: ddc(far * CITY_LABEL_RATIO),
-        scaleByDistance: nfs(far * 0.2, 1.05, far * CITY_LABEL_RATIO, 0.55),
+        scaleByDistance: nfs(far * 0.12, 1.0, far * CITY_LABEL_RATIO, 0.45),
       });
     }
     register({ id: 'cities', label: '도시 (7천+)', color: PALETTE.city, defaultOn: true, hasLabel: true, labelFields: ['NAME'], ds });

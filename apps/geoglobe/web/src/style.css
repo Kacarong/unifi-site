@@ -2,8 +2,8 @@
  * Vite 가 빌드 때 로컬 에셋으로 찾으려 해서 실패한다. */
 :root {
   --bg: #0b1020;
-  --panel: rgba(16, 22, 42, 0.94);
-  --panel-border: #2a3555;
+  --panel: rgba(13, 18, 34, 0.78);
+  --panel-border: rgba(116, 137, 188, 0.36);
   --text: #e6ecff;
   --muted: #9fb0d8;
   --accent: #4f8cff;
@@ -49,7 +49,7 @@ html, body {
 #topbar {
   position: fixed;
   top: 0; left: 0; right: 0;
-  height: calc(52px + env(safe-area-inset-top));
+  height: calc(48px + env(safe-area-inset-top));
   padding-top: env(safe-area-inset-top);
   display: flex;
   align-items: center;
@@ -61,19 +61,36 @@ html, body {
   pointer-events: none;
 }
 #topbar > * { pointer-events: auto; }
-#title { font-weight: 700; font-size: 17px; letter-spacing: 0.2px; text-shadow: 0 1px 4px #000; }
+#title { font-weight: 700; font-size: 16px; letter-spacing: 0.1px; text-shadow: 0 1px 4px #000; }
 
+/* 보이는 네모는 작게(지도를 덜 가리게), 누르는 면적은 44px 로 유지한다.
+ * 껍데기를 통째로 줄이면 지도 앱에서 ←·☰ 를 놓치기 쉬워진다. */
 .icon-btn {
-  width: 42px; height: 42px;
-  border-radius: 12px;
+  width: 44px; height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  display: grid;
+  place-items: center;
+  position: relative;
+  isolation: isolate;          /* 아래 ::before 의 z-index 를 이 버튼 안에 가둔다 */
+  color: var(--text);
+  font-size: 18px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.icon-btn::before {            /* 실제로 보이는 네모 */
+  content: "";
+  position: absolute;
+  inset: 4px;
+  z-index: -1;
+  border-radius: 11px;
   border: 1px solid var(--panel-border);
   background: var(--panel);
-  color: var(--text);
-  font-size: 20px;
-  cursor: pointer;
 }
+
 .icon-btn:active { transform: scale(0.94); }
-a.icon-btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 .topbar-left { display: flex; align-items: center; gap: 8px; }
 
 
@@ -162,7 +179,7 @@ button.primary:active { transform: scale(0.98); }
 
 #searchBar {
   position: fixed;
-  top: calc(58px + env(safe-area-inset-top));
+  top: calc(54px + env(safe-area-inset-top));
   left: 50%;
   transform: translateX(-50%);
   width: min(540px, calc(100vw - 20px));
@@ -173,15 +190,15 @@ button.primary:active { transform: scale(0.98); }
 }
 #searchInput {
   flex: 1;
-  height: 44px;
-  padding: 0 14px;
-  border-radius: 12px;
+  height: 40px;
+  padding: 0 13px;
+  border-radius: 11px;
   border: 1px solid var(--panel-border);
   background: var(--panel);
   color: var(--text);
-  font-size: 15px;
+  font-size: 14px;
   outline: none;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.34);
 }
 #searchInput::placeholder { color: var(--muted); }
 #searchClear { display: none; }
@@ -303,4 +320,26 @@ button.primary:active { transform: scale(0.98); }
 @media (prefers-reduced-motion: reduce) {
   .load-globe, .load-orbit { animation: none; }
   #loading, .load-bar > div { transition: none; }
+}
+
+@media (max-width: 640px) {
+  #topbar {
+    height: calc(44px + env(safe-area-inset-top));
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  #title { font-size: 15px; }
+  /* 좁은 화면에선 보이는 네모만 더 줄인다. 누르는 면적 44px 은 그대로 둔다 */
+  .icon-btn { font-size: 17px; }
+  .icon-btn::before { inset: 6px; border-radius: 10px; }
+  .topbar-left { gap: 2px; }
+  #searchBar {
+    top: calc(48px + env(safe-area-inset-top));
+    width: min(520px, calc(100vw - 18px));
+  }
+  #searchInput {
+    height: 44px;              /* 검색창도 손가락으로 칠 수 있게 */
+    font-size: 14px;
+    background: rgba(13, 18, 34, 0.72);
+  }
 }
