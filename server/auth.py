@@ -79,17 +79,36 @@ def issue() -> str:
     return f"{expires_at}.{_sign(expires_at)}"
 
 
-def valid(cookie: str | None) -> bool:
+def expires_in(cookie: str | None) -> int | None:
+    """쿠키가 유효하면 남은 초, 아니면 None."""
     if not cookie or "." not in cookie:
-        return False
+        return None
     raw_exp, _, sig = cookie.partition(".")
     try:
         expires_at = int(raw_exp)
     except ValueError:
-        return False
-    if expires_at < time.time():
-        return False
-    return hmac.compare_digest(sig, _sign(expires_at))
+        return None
+    left = expires_at - int(time.time())
+    if left <= 0:
+        return None
+    if not hmac.compare_digest(sig, _sign(expires_at)):
+        return None
+    return left
+
+
+def valid(cookie: str | None) -> bool:
+    return expires_in(cookie) is not None
+
+
+def needs_renewal(cookie: str | None) -> bool:
+    """쓰는 동안에는 기한을 늘려 준다 — 계속 쓰는 사람이 다시 로그인하지 않게.
+
+    고정 만료였을 때는 잘 쓰고 있어도 30일이 되면 갑자기 로그인 화면이 떴다.
+    절반 넘게 지났을 때만 새로 발급한다. 매 요청마다 쿠키를 새로 쓰면
+    응답에 불필요한 헤더가 계속 붙는다.
+    """
+    left = expires_in(cookie)
+    return left is not None and left < SESSION_DAYS * 86400 // 2
 
 
 def check_password(candidate: str, client: str) -> bool:

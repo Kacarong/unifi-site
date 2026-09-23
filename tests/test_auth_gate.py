@@ -63,6 +63,32 @@ def run() -> None:
     check("포털 열림", client.get("/").status_code, 200)
     check("앱 API 열림", client.get("/api/_apps").status_code, 200)
 
+    print("4-0) 로그인 상태는 쓰는 동안 저절로 연장된다")
+    import time as _time
+
+    from server import auth as _auth
+
+    # 갓 받은 쿠키는 굳이 다시 주지 않는다. 매 응답에 쿠키를 붙일 이유가 없다.
+    check("새 쿠키는 재발급 안 함",
+          any(k.lower() == "set-cookie" for k in client.get("/").headers), False)
+    # 절반 넘게 지난 쿠키는 조용히 새로 준다 — 30일마다 다시 로그인하지 않게.
+    near = int(_time.time()) + 5 * 86400
+    client.cookies.set("unifi_auth", f"{near}.{_auth._sign(near)}")
+    r = client.get("/")
+    check("얼마 안 남은 쿠키도 통과", r.status_code, 200)
+    check("연장 시 새 쿠키를 내려준다",
+          any(k.lower() == "set-cookie" for k in r.headers), True)
+    # 새로 내려준 쿠키를 응답 헤더에서 직접 꺼내 본다.
+    issued = r.headers["set-cookie"].split("unifi_auth=", 1)[1].split(";", 1)[0]
+    check("연장된 기한이 더 길다", _auth.expires_in(issued) > 20 * 86400, True)
+    # 위조한 쿠키는 연장은커녕 통과도 못 한다.
+    client.cookies.clear()
+    client.cookies.set("unifi_auth", f"{near}.deadbeef")
+    check("위조 쿠키는 막힌다", client.get("/").status_code, 401)
+    client.cookies.clear()
+    check("다시 로그인",
+          client.post("/api/_login", json={"password": "test-secret-pw"}).status_code, 200)
+
     print("4-1) 캐시 규칙 — 고친 화면이 옛 파일에 가려지면 안 된다")
     # 헤더가 없으면 브라우저가 서버에 묻지도 않고 옛 파일을 쓴다(실제로 겪음).
     for path in ("/", "/style.css", "/ui.css", "/app.js"):

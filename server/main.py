@@ -64,16 +64,31 @@ LOGIN_PAGE = os.path.join(SHELL_STATIC, "login.html")
 async def _password_gate(request: Request, call_next):
     """공개 배포용 비밀번호 게이트 (UNIFI_PASSWORD 가 있을 때만 동작)."""
     path = request.url.path
-    if (
-        not auth.enabled()
-        or auth.is_public_path(path)
-        or auth.valid(request.cookies.get(auth.COOKIE_NAME))
-    ):
+    if not auth.enabled() or auth.is_public_path(path):
         return await call_next(request)
+
+    cookie = request.cookies.get(auth.COOKIE_NAME)
+    if auth.valid(cookie):
+        response = await call_next(request)
+        # 쓰는 동안에는 로그인 상태가 안 끊기게 기한을 밀어 준다.
+        if auth.needs_renewal(cookie):
+            _set_session_cookie(response, request)
+        return response
 
     if path.startswith("/api/"):
         return JSONResponse({"detail": "로그인이 필요합니다"}, status_code=401)
     return FileResponse(LOGIN_PAGE, status_code=401, media_type="text/html")
+
+
+def _set_session_cookie(response, request: Request) -> None:
+    response.set_cookie(
+        auth.COOKIE_NAME,
+        auth.issue(),
+        max_age=auth.SESSION_DAYS * 86400,
+        httponly=True,
+        samesite="lax",
+        secure=request.headers.get("x-forwarded-proto", request.url.scheme) == "https",
+    )
 
 
 # 파일 이름에 내용 해시가 박힌 빌드 산출물 (예: index-BnQh4cpB.js).
@@ -122,14 +137,7 @@ def login(body: LoginBody, request: Request) -> JSONResponse:
         return JSONResponse({"detail": "비밀번호가 맞지 않습니다"}, status_code=401)
 
     res = JSONResponse({"ok": True})
-    res.set_cookie(
-        auth.COOKIE_NAME,
-        auth.issue(),
-        max_age=auth.SESSION_DAYS * 86400,
-        httponly=True,
-        samesite="lax",
-        secure=request.headers.get("x-forwarded-proto", request.url.scheme) == "https",
-    )
+    _set_session_cookie(res, request)
     return res
 
 
