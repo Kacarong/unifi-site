@@ -52,8 +52,11 @@ ingress:
   - service: http_status:404
 YAML
 
+# -f 를 주는 이유: 도메인을 Cloudflare 로 옮기면 원래 쓰던 A/CNAME 레코드가
+# 그대로 따라온다. 그게 남아 있으면 "이미 있다"며 실패한다. 어차피 이 이름은
+# 터널이 가져갈 것이므로 덮어쓴다.
 echo "[3/3] DNS 레코드 거는 중… ($HOST → 터널)"
-"$CLOUDFLARED" tunnel route dns "$TUNNEL" "$HOST"
+"$CLOUDFLARED" tunnel route dns --overwrite-dns "$TUNNEL" "$HOST"
 
 echo
 echo "끝났습니다. 아래로 적용하세요:"
