@@ -39,6 +39,10 @@ async function poll() {
   if (j.status === "done") {
     $("statusText").textContent = `완료! 슬라이드 ${j.result?.n_slides ?? "?"}개`;
     $("doneBtns").classList.remove("hidden");
+    // 전사가 끝났으면 아래 정리본 쪽에 바로 물려 준다.
+    // 예전에는 '작업 번호'를 직접 옮겨 적게 해 놓고, 정작 그 번호를
+    // 화면 어디에도 보여 주지 않았다. 손으로 옮길 이유가 없다.
+    attachTranscript(currentJob);
     loadPreview();
     return;
   }
@@ -66,6 +70,26 @@ async function loadPreview() {
 // ─────────────────────────── 요약정리본 ───────────────────────────
 
 let sourceId = null;
+
+// 위에서 끝난 추출 결과를 아래 정리본 입력에 물려 준다.
+function attachTranscript(jobId) {
+  $("nJobId").value = jobId;
+  $("nJobPick").innerHTML =
+    `✅ 위에서 추출한 전사를 쓸 준비가 됐습니다. <button type="button" class="btn" id="nDropJob"` +
+    ` style="padding:2px 10px;font-size:12px">안 쓸래요</button>`;
+  $("nDropJob").addEventListener("click", () => {
+    $("nJobId").value = "";
+    $("nJobPick").textContent = "위에서 영상을 추출하면 그 전사가 여기 자동으로 들어옵니다.";
+  });
+  if (!$("nTitle").value.trim()) $("nTitle").value = $("source").value.trim().slice(0, 80);
+}
+
+// 전사를 파일로 가진 경우 — 열어서 붙여넣는 수고를 대신한다.
+async function loadTranscriptFile(file) {
+  if (!file) return;
+  $("nTranscript").value = await file.text();
+  $("nJobId").value = "";
+}
 
 async function notesJob(jobId, label) {
   $("notesProgress").classList.remove("hidden");
@@ -200,6 +224,12 @@ $("nCreateBtn").addEventListener("click", createSource);
 $("nRenderBtn").addEventListener("click", renderNotes);
 
 $("startBtn").addEventListener("click", startJob);
+$("nTxt").addEventListener("change", (e) => loadTranscriptFile(e.target.files[0]));
+$("toNotesBtn").addEventListener("click", () => {
+  attachTranscript(currentJob);
+  $("notesUpload").scrollIntoView({ behavior: "smooth", block: "start" });
+  $("nTitle").focus();
+});
 $("dlZip").addEventListener("click", () => { window.location = `${API}/jobs/${currentJob}/download`; });
 $("dlBundle").addEventListener("click", () => { window.open(`${API}/jobs/${currentJob}/bundle`, "_blank"); });
 $("againBtn").addEventListener("click", () => {

@@ -110,7 +110,8 @@
     <div class="bar"><div id="barFill"></div></div>
     <div class="log" id="log"></div>
     <div class="row-btns hidden" id="doneBtns">
-      <button class="btn primary" id="dlZip">결과 zip 내려받기</button>
+      <button class="btn primary" id="toNotesBtn">이 전사로 정리본 만들기 ↓</button>
+      <button class="btn" id="dlZip">결과 zip 내려받기</button>
       <button class="btn" id="dlBundle">bundle.md 보기</button>
       <button class="btn" id="againBtn">새로 하기</button>
     </div>
@@ -134,14 +135,18 @@
     <label>강의자료 PDF
       <input id="nPdf" type="file" accept="application/pdf" />
     </label>
-    <label>전사 — 위에서 추출한 작업 번호를 넣거나 아래에 직접 붙여넣기
-      <input id="nJobId" type="text" placeholder="작업 번호 (비워도 됩니다)" />
-    </label>
+    <label>전사 — 셋 중 아무거나 하나</label>
+    <div class="hint" id="nJobPick">위에서 영상을 추출하면 그 전사가 여기 자동으로 들어옵니다.</div>
     <textarea id="nTranscript" rows="4"
-      placeholder="[00:00:00] 전사를 직접 붙여넣어도 됩니다"></textarea>
+      placeholder="전사 파일(.txt)을 올리거나, [00:00:00] 형식으로 여기에 직접 붙여넣으세요"></textarea>
+    <label>전사 파일로 올리기
+      <input id="nTxt" type="file" accept=".txt,.srt,.vtt,text/plain" />
+    </label>
+    <input id="nJobId" type="hidden" />
     <div class="hint">
-      PDF 글자 추출에는 LLM 을 쓰지 않습니다(PyMuPDF — 토큰 0). 색인은 <b>한 번만</b>
-      돌고, 이후 정리본 요청은 색인만 입력으로 씁니다. 원본을 통째로 다시 읽지 않습니다.
+      전사와 강의자료 PDF 를 <b>둘 다</b> 넣으면 강사 말과 자료를 맞춰 하나로 묶습니다.
+      하나만 넣어도 됩니다. PDF 글자 추출에는 LLM 을 쓰지 않습니다(PyMuPDF — 토큰 0).
+      색인은 <b>한 번만</b> 돌고, 이후 정리본 요청은 색인만 입력으로 씁니다.
     </div>
     <button id="nCreateBtn" class="btn primary full">업로드하고 색인 만들기</button>
   </section>
