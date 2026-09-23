@@ -92,6 +92,12 @@ def build_prompt(index: dict, *, parts: list[str], section_ids: list[str] | None
         "[요청하는 구성] 아래 순서 그대로, 각 항목을 `##` 제목으로 시작하세요.",
         wanted,
     ]
+    # 강의자료 PDF 없이 전사만 넣은 경우가 흔하다(영상만 올린 경우). 그때도 쪽수를
+    # 적으라고 시키면 목차 줄마다 '(PDF 쪽수: 인덱스에 해당 내용 없음)' 이 붙어
+    # 읽기 힘들어진다. 쪽수가 하나도 없으면 아예 언급하지 말라고 일러둔다.
+    if not any(s.get("pages") for s in index["sections"]):
+        blocks.append("[알림] 이 강의에는 강의자료 PDF 가 없습니다. 쪽수는 아예 적지 말고"
+                      " 타임코드만 쓰세요. '쪽수 없음' 같은 말도 쓰지 마세요.")
     if note.strip():
         blocks.append(f"[추가 요청]\n{note.strip()}")
     blocks.append("[강의 인덱스]\n" + _index_payload(index, section_ids))
