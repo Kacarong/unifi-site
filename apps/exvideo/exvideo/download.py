@@ -59,12 +59,14 @@ def _download_link(src: str, out_dir: str) -> str:
 
     # 합치기(merge)를 거치면 확장자가 바뀌므로 실제로 생긴 파일을 찾는다.
     path = ydl.prepare_filename(info)
-    if os.path.exists(path):
-        return path
-    found = sorted(glob.glob(stem + ".*"), key=os.path.getmtime)
-    if not found:
-        raise RuntimeError("내려받기는 끝났는데 파일이 없습니다.")
-    return _verify_media(found[-1])
+    if not os.path.exists(path):
+        found = sorted(glob.glob(stem + ".*"), key=os.path.getmtime)
+        if not found:
+            raise RuntimeError("내려받기는 끝났는데 파일이 없습니다.")
+        path = found[-1]
+    # 어느 쪽으로 찾았든 검사는 똑같이 거친다. 예전에는 prepare_filename 쪽 경로만
+    # 검사 없이 바로 돌려줘서, 직접 링크가 오류 HTML 을 저장한 경우가 새어 나갔다.
+    return _verify_media(path)
 
 
 def _verify_media(path: str) -> str:

@@ -229,6 +229,54 @@ def test_missing_ytdlp_message() -> None:
         shutil.rmtree(work, ignore_errors=True)
 
 
+def test_link_download_is_always_verified() -> None:
+    """내려받은 파일이 영상인지 검사하는 걸 어느 경로로도 건너뛰지 않는가.
+
+    prepare_filename 이 돌려준 경로가 존재하면 검사 없이 바로 돌려주던 때가 있었다.
+    직접 링크(.mp4)가 오류 HTML 을 그 이름으로 저장한 경우 그대로 새어 나갔다.
+    """
+    print("\n[7] 링크 내려받기 — 어느 경로로 찾았든 영상인지 검사한다")
+    work = tempfile.mkdtemp(prefix="unifi-dl-")
+    try:
+        sys.modules["yt_dlp"] = FakeYTDLPModule
+
+        class HtmlYDL(FakeYDL):
+            """prepare_filename 경로에 **HTML** 을 남기는 가짜."""
+
+            def extract_info(self, url, download=True):
+                self.path = self.opts["outtmpl"].replace("%(ext)s", "mp4")
+                with open(self.path, "wb") as f:
+                    f.write(b"<!DOCTYPE html><html><body>Not Found" + b" " * MIN_BYTES)
+                return {"url": url}
+
+        FakeYTDLPModule.YoutubeDL = HtmlYDL
+        try:
+            download.resolve_input("https://example.com/lecture.mp4", work)
+            ok("HTML 이 내려오면 거절한다", False)
+        except RuntimeError as exc:
+            ok("HTML 이 내려오면 거절한다", "웹페이지" in str(exc), str(exc)[:60])
+
+        class TinyYDL(FakeYDL):
+            """prepare_filename 경로에 너무 작은 파일을 남기는 가짜."""
+
+            def extract_info(self, url, download=True):
+                self.path = self.opts["outtmpl"].replace("%(ext)s", "mp4")
+                with open(self.path, "wb") as f:
+                    f.write(b"\x00\x00\x00\x18ftypmp42")
+                return {"url": url}
+
+        FakeYTDLPModule.YoutubeDL = TinyYDL
+        try:
+            download.resolve_input("https://example.com/lecture.mp4", work)
+            ok("토막 파일이면 거절한다", False)
+        except RuntimeError as exc:
+            ok("토막 파일이면 거절한다", "너무 작습니다" in str(exc), str(exc)[:60])
+    finally:
+        FakeYTDLPModule.YoutubeDL = FakeYDL
+        sys.modules.pop("yt_dlp", None)
+        shutil.rmtree(work, ignore_errors=True)
+
+
 def run() -> None:
     test_youtube_goes_through_ytdlp()
     test_quality_cap()
@@ -236,6 +284,7 @@ def run() -> None:
     test_local_and_gdrive()
     test_gdrive_failures()
     test_missing_ytdlp_message()
+    test_link_download_is_always_verified()
 
 
 if __name__ == "__main__":
