@@ -338,8 +338,28 @@ LABELS = {
 }
 
 
+# 아무것도 안 고르면 이 차례로 쓸 수 있는 첫 번째를 쓴다.
+# 계정 연동 클로드를 앞에 두는 이유: 색인 한 번 만드는 데 로컬 모델은 10분 넘게
+# 걸리고 클로드는 1분 안쪽이다. 둘 다 추가 비용이 없으니 빠른 쪽이 기본이다.
+DEFAULT_ORDER = ("claude-cli", "ollama")
+
+
+def default_provider_name() -> str:
+    """고른 게 없을 때 쓸 프로바이더 이름. 환경변수가 있으면 그게 우선이다."""
+    env = (os.environ.get("EXVIDEO_LLM") or "").strip().lower()
+    if env:
+        return env
+    for key in DEFAULT_ORDER:
+        try:
+            PROVIDERS[key]()          # 키·실행파일이 없으면 여기서 걸린다
+            return key
+        except LLMError:
+            continue
+    return DEFAULT_ORDER[-1]
+
+
 def get_provider(name: str | None = None, model: str | None = None):
-    key = (name or os.environ.get("EXVIDEO_LLM") or "ollama").lower()
+    key = (name or default_provider_name()).lower()
     if key not in PROVIDERS:
         raise LLMError(f"모르는 프로바이더: {key} (쓸 수 있는 값: {', '.join(PROVIDERS)})")
     return PROVIDERS[key](model=model)

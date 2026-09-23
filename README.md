@@ -106,9 +106,15 @@ python scripts/build.py geoglobe                          # 지구본 프론트 
 호출마다 **38,314 토큰**이 먼저 붙으므로, 도구·설정·슬래시명령을 전부 끄고
 부른다. 같은 호출이 **151 토큰**으로 떨어진다(둘 다 실측).
 
+**아무것도 안 고르면 `claude-cli` → `ollama` 차례로 쓸 수 있는 첫 번째를 쓴다.**
+색인 단계에도 그대로 적용된다. 로컬 모델은 색인 한 번에 10분 넘게 걸리고
+클로드는 1분 안쪽인데, 둘 다 추가 비용이 없으니 빠른 쪽이 기본이다.
+클로드가 없는 환경에서는 알아서 `ollama` 로 내려간다. `EXVIDEO_LLM` 을 지정하면
+그게 우선이다.
+
 ```bash
 ollama pull qwen2.5:7b                      # 로컬 모델
-export EXVIDEO_LLM=claude-cli               # 기본 프로바이더를 바꿀 때
+export EXVIDEO_LLM=ollama                   # 자동 선택 대신 하나로 고정할 때
 export EXVIDEO_CLAUDE_CLI=/path/to/claude   # PATH 에 없을 때만
 export EXVIDEO_CLAUDE_CLI_MODEL=sonnet      # 또는 opus / haiku
 export EXVIDEO_LLM_FALLBACK=claude-cli      # 로컬 모델이 한국어를 벗어날 때 넘길 곳
@@ -129,7 +135,8 @@ export EXVIDEO_LLM_FALLBACK=claude-cli      # 로컬 모델이 한국어를 벗�
 
 | 단계 | 모델 | 입력 토큰 | 비고 |
 | --- | --- | --- | --- |
-| 인덱스 생성 | ollama | 12,080 | 업로드당 한 번 |
+| 인덱스 생성 | claude-cli | 14,719 | 업로드당 한 번. **현재 기본값** |
+| 인덱스 생성 | ollama | 12,080 | 같은 일을 로컬로 — 10분 이상 걸린다 |
 | 정리본 재요청 (목차·요약·개념) | ollama | 4,130 | 인덱스만 입력 — **66% 절감** |
 | 예상문제만 | claude-cli | 5,769 | 한국어 이탈 0% (로컬은 96%) |
 | 6개 구성 전체 | claude-cli | 6,093 | 10쪽 PDF, 한 통에 완결 |
