@@ -217,15 +217,36 @@ cat ~/.config/unifi-site/public-url        # 현재 공개 주소
 
 ### 고정 도메인
 
-`deploy/tunnel.sh` 가 쓰는 Cloudflare quick tunnel 은 주소가 재시작마다 바뀐다.
-주소를 고정하려면 둘 중 하나로 바꾼다.
+`deploy/tunnel.sh` 는 고정 도메인이 준비돼 있으면 그걸 쓰고, 없으면 주소가
+재시작마다 바뀌는 quick tunnel 로 뜬다. 판단 기준은 `~/.cloudflared/config.yml`
+존재 여부다. 서비스 파일은 건드릴 필요가 없다.
 
-- **Cloudflare named tunnel** — 도메인 DNS 를 Cloudflare 로 옮긴 뒤
-  `cloudflared tunnel create unifi` + `cloudflared tunnel route dns unifi unifi.<도메인>`.
-  Cloudflare Access 를 얹으면 비밀번호 대신 구글 로그인으로 바꿀 수도 있다.
-- **기존 리버스 프록시에 추가** — 이미 TLS 를 끝내는 프록시가 있으면
-  `unifi.<도메인>` A 레코드를 추가하고 `→ <이 서버>:8090` 으로 프록시한다.
-  이때 `X-Forwarded-Proto: https` 를 넘겨야 세션 쿠키에 Secure 가 붙는다.
+**붙이는 순서** — 앞의 두 단계는 사람이 해야 한다. 서버에서 대신 할 수 없다.
+
+1. Cloudflare 계정에 도메인을 zone 으로 추가한다(Add a site). Cloudflare 가
+   네임서버 두 개를 알려준다.
+2. 도메인을 산 곳(예: hosting.co.kr)에서 네임서버를 그 두 개로 바꾼다.
+   zone 상태가 **Active** 가 될 때까지 기다린다. 보통 몇 분~몇 시간.
+3. 서버에서 로그인한다. 주소가 하나 나오고, 브라우저로 열어 도메인을 고르면
+   `~/.cloudflared/cert.pem` 이 생긴다.
+
+   ```bash
+   ~/bin/cloudflared tunnel login
+   ```
+4. 나머지는 스크립트가 한다. 터널 생성 → `config.yml` 작성 → DNS 레코드까지.
+
+   ```bash
+   deploy/named-tunnel.sh unifi.<도메인>
+   systemctl --user restart unifi-tunnel.service
+   ```
+
+여러 번 실행해도 안전하다. 같은 이름의 터널이 있으면 다시 만들지 않는다.
+
+Cloudflare Access 를 얹으면 비밀번호 대신 구글 로그인으로 바꿀 수도 있다.
+
+**터널 대신 기존 리버스 프록시를 쓰는 경우** — 이미 TLS 를 끝내는 프록시가 있으면
+`unifi.<도메인>` A 레코드를 추가하고 `→ <이 서버>:8090` 으로 프록시한다.
+이때 `X-Forwarded-Proto: https` 를 넘겨야 세션 쿠키에 Secure 가 붙는다.
 
 ## 구조
 
