@@ -108,6 +108,20 @@ export EXVIDEO_LLM_FALLBACK=claude-cli      # 로컬 모델이 한국어를 벗�
 python3 tests/test_exvideo_notes.py    # LLM 없이 도는 테스트 (가짜 프로바이더)
 ```
 
+## 영상 넣는 법 (ex-video 의 추출기)
+
+넣을 수 있는 것은 네 가지다. 유튜브 주소, 구글드라이브 공유 링크, 직접 링크
+(`.mp4`·`.m3u8`), 서버 로컬 경로. 유튜브와 직접 링크·HLS 는 yt-dlp 가, 구글드라이브는
+gdown 이 맡는다.
+
+**720p 까지만 받는다.** 전사와 슬라이드 글자에는 그걸로 충분하다. 상한을 걸기 전에는
+유튜브 4K 원본으로 690MB 를 받아 온 적이 있고, 상한을 건 뒤 같은 영상이 78MB 다.
+더 높은 화질이 필요하면 `EXVIDEO_MAX_HEIGHT` 로 올린다.
+
+```bash
+python3 tests/test_exvideo_download.py   # 망 접속 없이 도는 테스트 (가짜 yt-dlp)
+```
+
 ## 공개 배포
 
 `UNIFI_PASSWORD` 를 설정하면 사이트 전체에 비밀번호 게이트가 걸린다. 비워 두면

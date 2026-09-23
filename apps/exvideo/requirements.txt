@@ -7,8 +7,11 @@ numpy>=1.24
 Pillow>=10.0
 ImageHash>=4.3
 
-# 구글드라이브 등 링크 다운로드
+# 구글드라이브 공유 링크 다운로드
 gdown>=5.1
+
+# 유튜브·직접링크(.mp4)·HLS(.m3u8) 다운로드
+yt-dlp>=2025.1
 
 # 음성 전사 (로컬, GPU 가속 지원). GPU면 자동으로 CUDA 사용.
 faster-whisper>=1.0

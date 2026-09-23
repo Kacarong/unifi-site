@@ -86,8 +86,8 @@
   </section>
 
   <section class="panel reveal" id="form">
-    <label>영상 주소 (구글드라이브 공유 링크 / URL / 서버 로컬 경로)
-      <input id="source" type="text" placeholder="https://drive.google.com/file/d/FILEID/view" />
+    <label>영상 주소 (유튜브 / 구글드라이브 공유 링크 / 직접 링크 / 서버 로컬 경로)
+      <input id="source" type="text" placeholder="https://www.youtube.com/watch?v=..." />
     </label>
     <div class="opts">
       <label><input type="checkbox" id="transcribe" checked /> 음성 전사</label>
@@ -99,7 +99,9 @@
         </select>
       </label>
     </div>
-    <div class="hint">구글드라이브는 "링크가 있는 모든 사용자" 권한이어야 합니다. 첫 실행은 모델 다운로드로 시간이 걸릴 수 있어요.</div>
+    <div class="hint">유튜브는 비공개가 아니면 됩니다(일부 공개도 가능). 구글드라이브는 "링크가 있는 모든
+      사용자" 권한이어야 합니다. 영상은 720p 까지만 받습니다 — 전사와 슬라이드 글자에는 충분하고
+      원본 화질로 받으면 수백 MB 가 됩니다. 첫 실행은 모델 다운로드로 시간이 걸릴 수 있어요.</div>
     <button id="startBtn" class="btn primary full">추출 시작</button>
   </section>
 
