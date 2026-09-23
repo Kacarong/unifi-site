@@ -42,6 +42,17 @@ class LLMError(RuntimeError):
     pass
 
 
+def _explain(msg: str) -> str:
+    """자주 나오는 실패는 무엇을 하면 되는지까지 적어 준다."""
+    low = msg.lower()
+    if "oauth" in low and ("expire" in low or "401" in low):
+        return (msg[:200] + " — 로그인이 만료됐습니다. `claude` 로 다시 로그인하거나,"
+                " CLAUDE_CONFIG_DIR 을 갱신되는 자격증명 폴더로 지정하세요.")
+    if "authentication_failed" in low or "401" in low:
+        return msg[:200] + " — 인증에 실패했습니다. 자격증명을 확인하세요."
+    return msg[:400]
+
+
 def _join_overlap(head: str, tail: str, window: int = 400) -> str:
     """앞뒤가 겹쳐 나온 만큼 덜어내고 잇는다. 겹침이 없으면 그냥 붙인다."""
     if not head or not tail:
@@ -169,13 +180,15 @@ class ClaudeCLIProvider:
             except OSError as exc:
                 raise LLMError(f"Claude Code 실행 실패 ({self.binary}): {exc}") from exc
 
-        if proc.returncode != 0:
-            raise LLMError(f"Claude Code 호출 실패(exit {proc.returncode}): "
-                           f"{(proc.stderr or proc.stdout).strip()[:400]}")
-
+        # 진짜 이유는 스트림 안에 들어 있다. 종료 코드만 보고 stdout 앞부분을
+        # 그대로 붙이면 쓸모없는 init 이벤트만 보인다. 실제로 그랬다 —
+        # "토큰이 만료됐다" 는 말 대신 JSON 덩어리가 화면에 떴다.
         text, usage, error, chunks = self._collect_text(proc.stdout)
         if error:
-            raise LLMError(f"Claude Code 오류: {error[:400]}")
+            raise LLMError(f"Claude Code 오류: {_explain(error)}")
+        if proc.returncode != 0:
+            detail = (proc.stderr or "").strip() or (text.strip()[:200]) or "자세한 내용 없음"
+            raise LLMError(f"Claude Code 호출 실패(exit {proc.returncode}): {_explain(detail)}")
         if not text.strip():
             raise LLMError("Claude Code 가 빈 응답을 돌려줬습니다.")
 

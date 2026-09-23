@@ -112,8 +112,14 @@ python scripts/build.py geoglobe                          # 지구본 프론트 
 클로드가 없는 환경에서는 알아서 `ollama` 로 내려간다. `EXVIDEO_LLM` 을 지정하면
 그게 우선이다.
 
+**서비스로 돌릴 때는 자격증명 폴더를 지정해야 한다.** `claude` 는 기본으로
+`~/.claude` 의 토큰을 쓰는데, 사람이 직접 쓰지 않는 서버에서는 아무도 갱신해 주지
+않아 만료된다. 만료되면 화면에는 "색인 실패" 로만 보이고 원인이 안 드러난다.
+갱신되는 폴더를 `CLAUDE_CONFIG_DIR` 로 가리키거나, 주기적으로 다시 로그인한다.
+
 ```bash
 ollama pull qwen2.5:7b                      # 로컬 모델
+export CLAUDE_CONFIG_DIR=/path/to/claude    # 갱신되는 자격증명 폴더
 export EXVIDEO_LLM=ollama                   # 자동 선택 대신 하나로 고정할 때
 export EXVIDEO_CLAUDE_CLI=/path/to/claude   # PATH 에 없을 때만
 export EXVIDEO_CLAUDE_CLI_MODEL=sonnet      # 또는 opus / haiku
