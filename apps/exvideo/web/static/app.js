@@ -71,15 +71,29 @@ async function loadPreview() {
 
 let sourceId = null;
 
+const MANUAL_HINT =
+  "위에서 영상을 추출하면 전사가 자동으로 들어옵니다. 영상 없이 전사만 있으면 아래에 넣으세요.";
+
+// 전사를 직접 넣는 칸을 접었다 폈다 한다. 자동으로 물려 있을 때 텍스트박스가
+// 그대로 보이면, 여기에 또 붙여넣으라는 뜻으로 읽힌다.
+function showManual(on) {
+  $("nManual").classList.toggle("hidden", !on);
+}
+
 // 위에서 끝난 추출 결과를 아래 정리본 입력에 물려 준다.
 function attachTranscript(jobId) {
   $("nJobId").value = jobId;
+  $("nTranscript").value = "";
+  showManual(false);
   $("nJobPick").innerHTML =
-    `✅ 위에서 추출한 전사를 쓸 준비가 됐습니다. <button type="button" class="btn" id="nDropJob"` +
-    ` style="padding:2px 10px;font-size:12px">안 쓸래요</button>`;
+    `<b>✅ 위에서 추출한 전사를 씁니다.</b> 아래에 다시 붙여넣지 않아도 됩니다 —` +
+    ` 강의자료 PDF 만 고르고 아래 버튼을 누르세요.` +
+    ` <button type="button" class="btn" id="nDropJob"` +
+    ` style="padding:2px 10px;font-size:12px;margin-left:6px">전사 직접 넣을래요</button>`;
   $("nDropJob").addEventListener("click", () => {
     $("nJobId").value = "";
-    $("nJobPick").textContent = "위에서 영상을 추출하면 그 전사가 여기 자동으로 들어옵니다.";
+    $("nJobPick").textContent = MANUAL_HINT;
+    showManual(true);
   });
   if (!$("nTitle").value.trim()) $("nTitle").value = $("source").value.trim().slice(0, 80);
 }
