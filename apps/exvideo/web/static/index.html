@@ -156,6 +156,10 @@
     <div class="hint" id="nIndexInfo"></div>
     <label>어떤 구성으로 만들까요</label>
     <div class="opts" id="nParts"></div>
+    <label>또는 구성을 직접 적기 — 한 줄에 한 항목. 적으면 위 선택은 무시합니다
+      <textarea id="nOutline" rows="4"
+        placeholder="1. 한눈에 보기 — 이 강의가 뭘 하는 시간인지 3줄&#10;2. 꼭 외울 것 — 정의와 공식만 모아서&#10;3. 헷갈리는 짝 — 비슷해서 틀리기 쉬운 개념 비교&#10;4. 셀프 체크 — 빈칸 채우기 10문제"></textarea>
+    </label>
     <label>섹션 고르기 — 아무것도 안 고르면 전체
       <select id="nSections" multiple size="6"></select>
     </label>
@@ -168,6 +172,33 @@
       <textarea id="nNote" rows="3"
         placeholder="예: 예상문제 위주로, 표 없이. 시험 직전에 훑을 수 있게 짧게."></textarea>
     </label>
+    <label>PDF 모양</label>
+    <div class="opts">
+      <label>글자 크기
+        <select id="dScale">
+          <option value="0.85">작게</option>
+          <option value="1" selected>보통</option>
+          <option value="1.15">크게</option>
+        </select>
+      </label>
+      <label>줄 간격
+        <select id="dLine">
+          <option value="1.3">좁게</option>
+          <option value="1.55" selected>보통</option>
+          <option value="1.9">넓게</option>
+        </select>
+      </label>
+      <label>여백
+        <select id="dMargin">
+          <option value="12">좁게</option>
+          <option value="20" selected>보통</option>
+          <option value="30">넓게</option>
+        </select>
+      </label>
+      <label>제목 색
+        <input id="dAccent" type="color" value="#111827" />
+      </label>
+    </div>
     <button id="nRenderBtn" class="btn primary full">정리본 PDF 만들기</button>
     <div class="log hidden" id="nOutputs"></div>
   </section>

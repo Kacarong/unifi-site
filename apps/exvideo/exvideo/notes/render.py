@@ -85,9 +85,15 @@ def _index_payload(index: dict, section_ids: list[str] | None) -> str:
 
 
 def build_prompt(index: dict, *, parts: list[str], section_ids: list[str] | None = None,
-                 note: str = "", raw_text: str = "") -> str:
-    chosen = [p for p in parts if p in PARTS] or ["summary"]
-    wanted = "\n".join(f"{i}. **{PARTS[p][0]}** — {PARTS[p][1]}" for i, p in enumerate(chosen, 1))
+                 note: str = "", raw_text: str = "", outline: str = "") -> str:
+    # 정해진 여섯 조각으로 안 되는 구성을 원할 때가 있다. 그때는 사용자가 적은
+    # 항목 목록을 그대로 쓴다. 체크박스는 무시한다.
+    if outline.strip():
+        wanted = outline.strip()
+    else:
+        chosen = [p for p in parts if p in PARTS] or ["summary"]
+        wanted = "\n".join(f"{i}. **{PARTS[p][0]}** — {PARTS[p][1]}"
+                           for i, p in enumerate(chosen, 1))
     blocks = [
         "[요청하는 구성] 아래 순서 그대로, 각 항목을 `##` 제목으로 시작하세요.",
         wanted,
@@ -112,7 +118,8 @@ def build_prompt(index: dict, *, parts: list[str], section_ids: list[str] | None
 def generate(source_id: str, *, parts: list[str], section_ids: list[str] | None = None,
              note: str = "", raw_sections: list[str] | None = None,
              provider_name: str | None = None, model: str | None = None,
-             max_tokens: int = 0, progress=None) -> dict:
+             max_tokens: int = 0, outline: str = "", design: dict | None = None,
+             progress=None) -> dict:
     index = idx.load_index(source_id)
     if not index:
         raise FileNotFoundError("인덱스가 아직 없습니다. 먼저 인덱스를 만드세요.")
@@ -122,10 +129,13 @@ def generate(source_id: str, *, parts: list[str], section_ids: list[str] | None 
             progress(msg, pct)
 
     raw_text = idx.load_raw_sections(source_id, raw_sections) if raw_sections else ""
-    prompt = build_prompt(index, parts=parts, section_ids=section_ids, note=note, raw_text=raw_text)
+    prompt = build_prompt(index, parts=parts, section_ids=section_ids, note=note,
+                          raw_text=raw_text, outline=outline)
 
     provider = get_provider(provider_name, model)
-    budget = max_tokens or max(2000, 1200 * max(1, len(parts)))
+    # 자유 구성은 항목 수를 셀 수 없으니 줄 수로 어림한다.
+    n_parts = len([l for l in outline.splitlines() if l.strip()]) if outline.strip() else len(parts)
+    budget = max_tokens or max(2000, 1200 * max(1, n_parts))
     report(f"{provider.name}/{provider.model} 로 정리본 생성 중…", 20)
     res = provider.complete(SYSTEM, prompt, max_tokens=budget)
 
@@ -161,8 +171,9 @@ def generate(source_id: str, *, parts: list[str], section_ids: list[str] | None 
 
     report("PDF 조판 중…", 80)
     pdf_path = os.path.join(out_dir, f"{render_id}.pdf")
-    subtitle = " · ".join(PARTS[p][0] for p in parts if p in PARTS)
-    write_pdf(res.text, pdf_path, title=index["title"], subtitle=subtitle)
+    subtitle = "직접 정한 구성" if outline.strip() else \
+        " · ".join(PARTS[p][0] for p in parts if p in PARTS)
+    write_pdf(res.text, pdf_path, title=index["title"], subtitle=subtitle, design=design)
 
     usage = {
         "stage": "render", "render_id": render_id,
@@ -175,6 +186,8 @@ def generate(source_id: str, *, parts: list[str], section_ids: list[str] | None 
         "foreign_ratio": round(drift, 3),
         # 1 보다 크면 답변이 잘려 이어 쓴 것 — 이은 자리가 성글 수 있다
         "chunks": res.chunks,
+        "outline": outline.strip(),
+        "design": resolve_design(design),
     }
     idx.log_usage(source_id, usage)
 
@@ -297,7 +310,34 @@ def _inline(text: str) -> str:
     return out
 
 
-def write_pdf(markdown: str, path: str, *, title: str = "", subtitle: str = "") -> str:
+# 조판 기본값. 사용자가 고른 값만 덮어쓴다.
+DESIGN = {
+    "scale": 1.0,        # 글자 크기 배율 (0.85 작게 ~ 1.2 크게)
+    "line": 1.55,        # 줄 간격 배율
+    "margin": 20,        # 좌우 여백 (mm)
+    "accent": "#111827", # 제목 색
+}
+
+
+def resolve_design(design: dict | None) -> dict:
+    """사용자가 준 값을 받아들이되 조판이 깨지지 않는 범위로 자른다."""
+    d = dict(DESIGN)
+    for k, v in (design or {}).items():
+        if k in d and v not in (None, ""):
+            d[k] = v
+    try:
+        d["scale"] = min(1.4, max(0.75, float(d["scale"])))
+        d["line"] = min(2.2, max(1.1, float(d["line"])))
+        d["margin"] = min(40, max(8, float(d["margin"])))
+    except (TypeError, ValueError):
+        return dict(DESIGN)
+    if not re.fullmatch(r"#[0-9A-Fa-f]{6}", str(d["accent"])):
+        d["accent"] = DESIGN["accent"]
+    return d
+
+
+def write_pdf(markdown: str, path: str, *, title: str = "", subtitle: str = "",
+              design: dict | None = None) -> str:
     from reportlab.lib.enums import TA_LEFT
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle
@@ -306,22 +346,25 @@ def write_pdf(markdown: str, path: str, *, title: str = "", subtitle: str = "") 
                                     SimpleDocTemplate, Spacer)
 
     font = _register_font()
+    d = resolve_design(design)
+    z, lead, side = d["scale"], d["line"], d["margin"]
 
     def style(name, size, **kw):
-        return ParagraphStyle(name, fontName=font, fontSize=size, leading=size * 1.55,
+        size = size * z
+        return ParagraphStyle(name, fontName=font, fontSize=size, leading=size * lead,
                               alignment=TA_LEFT, **kw)
 
-    s_title = style("t", 21, spaceAfter=4)
+    s_title = style("t", 21, spaceAfter=4, textColor=d["accent"])
     s_sub = style("st", 10.5, textColor="#6b7280", spaceAfter=18)
-    s_h1 = style("h1", 16.5, spaceBefore=16, spaceAfter=7)
-    s_h2 = style("h2", 13.5, spaceBefore=13, spaceAfter=5)
+    s_h1 = style("h1", 16.5, spaceBefore=16, spaceAfter=7, textColor=d["accent"])
+    s_h2 = style("h2", 13.5, spaceBefore=13, spaceAfter=5, textColor=d["accent"])
     s_h3 = style("h3", 11.5, spaceBefore=10, spaceAfter=4)
     s_body = style("b", 10.5, spaceAfter=5)
     s_li = style("li", 10.5, spaceAfter=2)
 
     doc = SimpleDocTemplate(
         path, pagesize=A4,
-        leftMargin=20 * mm, rightMargin=20 * mm, topMargin=18 * mm, bottomMargin=18 * mm,
+        leftMargin=side * mm, rightMargin=side * mm, topMargin=18 * mm, bottomMargin=18 * mm,
         title=title or "요약정리본", author="unifi-site · ex-video",
     )
 
@@ -386,7 +429,7 @@ def write_pdf(markdown: str, path: str, *, title: str = "", subtitle: str = "") 
         canvas.saveState()
         canvas.setFont(font, 8)
         canvas.setFillColorRGB(0.45, 0.47, 0.52)
-        canvas.drawRightString(A4[0] - 20 * mm, 11 * mm, str(canvas.getPageNumber()))
+        canvas.drawRightString(A4[0] - side * mm, 11 * mm, str(canvas.getPageNumber()))
         canvas.restoreState()
 
     doc.build(flow, onFirstPage=footer, onLaterPages=footer)

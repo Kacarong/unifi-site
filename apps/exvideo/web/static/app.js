@@ -150,7 +150,9 @@ async function loadProviders() {
 
 async function renderNotes() {
   const parts = [...$("nParts").querySelectorAll("input:checked")].map((c) => c.value);
-  if (!parts.length) { alert("구성을 하나 이상 고르세요."); return; }
+  const outline = $("nOutline").value.trim();
+  // 구성을 직접 적었으면 체크박스는 안 골라도 된다.
+  if (!parts.length && !outline) { alert("구성을 고르거나 직접 적으세요."); return; }
   const sections = [...$("nSections").selectedOptions].map((o) => o.value);
 
   $("nRenderBtn").disabled = true;
@@ -163,6 +165,13 @@ async function renderNotes() {
         raw_sections: $("nRaw").checked && sections.length ? sections : null,
         note: $("nNote").value.trim(),
         provider: $("nProvider").value || null,
+        outline,
+        design: {
+          scale: Number($("dScale").value),
+          line: Number($("dLine").value),
+          margin: Number($("dMargin").value),
+          accent: $("dAccent").value,
+        },
       }),
     })).json();
     if (await notesJob(job_id, "정리본")) {

@@ -333,8 +333,44 @@ def test_claude_cli_stream() -> None:
     ok("오류는 삼키지 않는다", "rate limit" in error, error)
 
 
+def test_custom_outline_and_design() -> None:
+    """사용자가 직접 정한 구성과 조판 설정이 실제로 반영되는가."""
+    print("\n[10] 직접 정한 구성 · PDF 모양")
+
+    outline = "1. 한눈에 보기 — 3줄\n2. 꼭 외울 것 — 공식만"
+    p = nrender.build_prompt({"title": "T", "version": 1, "sections": []},
+                             parts=["toc", "summary"], outline=outline)
+    ok("직접 적은 항목이 프롬프트에 들어간다", "한눈에 보기" in p and "꼭 외울 것" in p)
+    ok("직접 적었으면 기본 구성은 빠진다", "핵심요약" not in p and "목차" not in p, p[:80])
+
+    p2 = nrender.build_prompt({"title": "T", "version": 1, "sections": []},
+                              parts=["summary"], outline="")
+    ok("안 적었으면 고른 구성을 쓴다", "핵심요약" in p2)
+
+    d = nrender.resolve_design
+    check("기본값", d(None), nrender.DESIGN)
+    check("일부만 줘도 나머지는 기본", d({"scale": 1.15})["line"], nrender.DESIGN["line"])
+    check("너무 큰 값은 자른다", d({"scale": 99})["scale"], 1.4)
+    check("너무 작은 값도 자른다", d({"line": 0.1})["line"], 1.1)
+    check("색이 아니면 기본색", d({"accent": "red"})["accent"], nrender.DESIGN["accent"])
+    check("정상 색은 통과", d({"accent": "#2563EB"})["accent"], "#2563EB")
+    check("숫자가 아니면 통째로 기본값", d({"margin": "넓게"}), nrender.DESIGN)
+
+    # 실제로 조판해서 설정이 먹는지 본다 — 값만 받아두고 안 쓰면 의미가 없다.
+    import pymupdf
+    sizes = {}
+    for name, design in (("small", {"scale": 0.85}), ("big", {"scale": 1.3})):
+        path = os.path.join(_TMP, f"design-{name}.pdf")
+        nrender.write_pdf("# 제목\n\n본문입니다.", path, title="T", design=design)
+        doc = pymupdf.open(path)
+        sizes[name] = max(s["size"] for b in doc[0].get_text("dict")["blocks"]
+                          for l in b.get("lines", []) for s in l["spans"])
+    ok("글자 크기 설정이 PDF 에 반영된다", sizes["big"] > sizes["small"],
+       f"{sizes['small']:.1f} < {sizes['big']:.1f}")
+
+
 def test_pdf_output(meta: dict) -> None:
-    print("\n[10] 결과물 PDF — 한글이 깨지지 않는가")
+    print("\n[11] 결과물 PDF — 한글이 깨지지 않는가")
     ok("PDF 가 생겼다", os.path.exists(meta["pdf"]))
     pages = extract.pdf_pages(meta["pdf"])
     text = "\n".join(p.text for p in pages)
@@ -345,7 +381,7 @@ def test_pdf_output(meta: dict) -> None:
 
 
 def test_api(pdf_path: str) -> None:
-    print("\n[11] API 왕복")
+    print("\n[12] API 왕복")
     from fastapi.testclient import TestClient
     from server.main import app
 
@@ -408,6 +444,7 @@ def run() -> None:
     meta = test_index_and_render(pdf_path)
     test_normalize()
     test_claude_cli_stream()
+    test_custom_outline_and_design()
     test_pdf_output(meta)
     test_api(pdf_path)
     shutil.rmtree(work, ignore_errors=True)

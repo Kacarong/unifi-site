@@ -272,6 +272,8 @@ class RenderRequest(BaseModel):
     note: str = ""
     provider: str | None = None
     model: str | None = None
+    outline: str = ""                      # 직접 적은 구성 (있으면 parts 대신 쓴다)
+    design: dict | None = None             # 조판 설정 (scale/line/margin/accent)
 
 
 @router.post("/notes/sources/{source_id}/render")
@@ -284,7 +286,7 @@ def render_notes(source_id: str, req: RenderRequest) -> dict:
     return {"job_id": _note_job(lambda p: notes_render.generate(
         source_id, parts=req.parts, section_ids=req.sections, note=req.note,
         raw_sections=req.raw_sections, provider_name=req.provider, model=req.model,
-        progress=p))}
+        outline=req.outline, design=req.design, progress=p))}
 
 
 @router.get("/notes/sources/{source_id}/outputs/{render_id}.pdf")
