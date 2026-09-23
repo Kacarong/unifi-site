@@ -25,6 +25,8 @@ sys.path.insert(0, ROOT)
 
 from apps.exvideo.exvideo import download  # noqa: E402
 
+MIN_BYTES = download.MIN_MEDIA_BYTES
+
 FAILURES: list[str] = []
 
 
@@ -57,9 +59,11 @@ class FakeYDL:
         return False
 
     def extract_info(self, url, download=True):
+        # 인자 이름 download 가 모듈 이름을 가리므로 미리 빼 둔 상수를 쓴다.
         self.path = self.opts["outtmpl"].replace("%(ext)s", FakeYDL.made_ext)
         with open(self.path, "wb") as f:
-            f.write(b"\x00\x00\x00\x18ftypmp42")  # mp4 헤더 흉내
+            f.write(b"\x00\x00\x00\x18ftypmp42")   # mp4 헤더 흉내
+            f.write(b"\x00" * MIN_BYTES)           # 크기 검사를 통과할 만큼
         return {"url": url}
 
     def prepare_filename(self, info):
@@ -152,8 +156,63 @@ def test_local_and_gdrive() -> None:
         shutil.rmtree(work, ignore_errors=True)
 
 
+class FakeGdown:
+    """실패 방식을 골라 흉내 낼 수 있는 가짜 gdown."""
+
+    mode = "ok"   # ok | none | raise | html | tiny
+
+    @staticmethod
+    def download(id=None, output=None, quiet=False):
+        if FakeGdown.mode == "none":
+            return None                      # 옛 판은 실패를 None 으로 알린다
+        if FakeGdown.mode == "raise":
+            raise RuntimeError("Permission denied")
+        with open(output, "wb") as f:
+            if FakeGdown.mode == "html":
+                f.write(b"<!DOCTYPE html><html><body>\xeb\xa1\x9c\xea\xb7\xb8\xec\x9d\xb8"
+                        + b" " * MIN_BYTES)
+            elif FakeGdown.mode == "tiny":
+                f.write(b"\x00\x00\x00\x18ftypmp42")
+            else:
+                f.write(b"\x00\x00\x00\x18ftypmp42" + b"\x00" * MIN_BYTES)
+        return output
+
+
+def test_gdrive_failures() -> None:
+    """구글드라이브가 실패했는데 성공한 척하지 않는가.
+
+    예전에는 gdown 의 반환값을 안 보고 무조건 경로를 돌려줬다. 실패해도 없는 파일을
+    넘기고, 권한이 없으면 안내 페이지를 영상인 척 넘겼다.
+    """
+    print("\n[5] 구글드라이브 실패 — 성공한 척하지 않는다")
+    work = tempfile.mkdtemp(prefix="unifi-dl-")
+    saved = sys.modules.get("gdown")
+    url = "https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUvWxYz012345/view"
+    try:
+        sys.modules["gdown"] = FakeGdown
+
+        FakeGdown.mode = "ok"
+        path = download.resolve_input(url, work)
+        ok("정상일 때는 경로를 준다", os.path.exists(path), path)
+
+        for mode, hint in (("none", "공유 권한"), ("raise", "내려받지 못했습니다"),
+                           ("html", "웹페이지"), ("tiny", "너무 작습니다")):
+            FakeGdown.mode = mode
+            try:
+                download.resolve_input(url, work)
+                ok(f"{mode}: 실패를 잡아낸다", False)
+            except RuntimeError as exc:
+                ok(f"{mode}: 실패를 잡아낸다", hint in str(exc), str(exc)[:60])
+    finally:
+        FakeGdown.mode = "ok"
+        sys.modules.pop("gdown", None)
+        if saved is not None:
+            sys.modules["gdown"] = saved
+        shutil.rmtree(work, ignore_errors=True)
+
+
 def test_missing_ytdlp_message() -> None:
-    print("\n[5] yt-dlp 가 없을 때 — 무슨 일인지 알 수 있게 말해 준다")
+    print("\n[6] yt-dlp 가 없을 때 — 무슨 일인지 알 수 있게 말해 준다")
     work = tempfile.mkdtemp(prefix="unifi-dl-")
     saved = sys.modules.pop("yt_dlp", None)
     try:
@@ -175,6 +234,7 @@ def run() -> None:
     test_quality_cap()
     test_merged_extension()
     test_local_and_gdrive()
+    test_gdrive_failures()
     test_missing_ytdlp_message()
 
 

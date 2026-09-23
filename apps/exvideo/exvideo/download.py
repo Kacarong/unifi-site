@@ -6,6 +6,9 @@ import re
 # 내려받을 영상의 세로 해상도 상한
 MAX_HEIGHT = int(os.environ.get("EXVIDEO_MAX_HEIGHT", "720"))
 
+# 이보다 작으면 영상이 아니라 오류 페이지로 본다. 가장 짧은 강의도 이보다는 크다.
+MIN_MEDIA_BYTES = 64 * 1024
+
 
 def _gdrive_id(url: str):
     # https://drive.google.com/file/d/<ID>/view  또는 ?id=<ID>
@@ -61,7 +64,31 @@ def _download_link(src: str, out_dir: str) -> str:
     found = sorted(glob.glob(stem + ".*"), key=os.path.getmtime)
     if not found:
         raise RuntimeError("내려받기는 끝났는데 파일이 없습니다.")
-    return found[-1]
+    return _verify_media(found[-1])
+
+
+def _verify_media(path: str) -> str:
+    """받아온 게 정말 영상인지 그 자리에서 확인한다.
+
+    여기서 안 막으면 전사 단계까지 끌고 가서 엉뚱한 오류로 터진다. 실제로 유튜브
+    링크에서 재생 페이지 HTML 이 `source_video.mp4` 로 저장된 적이 있다. 구글드라이브도
+    권한이 없으면 같은 식으로 안내 페이지가 내려온다.
+    """
+    if not os.path.exists(path):
+        raise RuntimeError(f"내려받기에 실패했습니다: {path} 가 만들어지지 않았습니다.")
+    size = os.path.getsize(path)
+    if size < MIN_MEDIA_BYTES:
+        raise RuntimeError(
+            f"내려받은 파일이 너무 작습니다({size:,}바이트). 영상이 아니라 오류 페이지일 수 있습니다."
+        )
+    with open(path, "rb") as f:
+        head = f.read(512).lstrip()
+    if head[:1] == b"<" or head[:9].lower() == b"<!doctype":
+        raise RuntimeError(
+            "영상 대신 웹페이지가 내려왔습니다. 공개 권한(구글드라이브는 '링크가 있는 모든 사용자')을"
+            " 확인하세요."
+        )
+    return path
 
 
 def resolve_input(src: str, out_dir: str) -> str:
@@ -78,8 +105,18 @@ def resolve_input(src: str, out_dir: str) -> str:
         import gdown  # 지연 임포트
         dest = os.path.join(out_dir, "source_video.mp4")
         print(f"[다운로드] 구글드라이브에서 내려받는 중 (id={gid}) ...")
-        gdown.download(id=gid, output=dest, quiet=False)
-        return dest
+        # gdown 은 판(version)에 따라 실패를 예외로 던지기도 하고 None 을 돌려주기도 한다.
+        # 돌려준 값을 안 보면 실패해도 없는 경로를 그대로 넘기게 된다.
+        try:
+            got = gdown.download(id=gid, output=dest, quiet=False)
+        except Exception as exc:
+            raise RuntimeError(f"구글드라이브에서 내려받지 못했습니다: {exc}") from exc
+        if not got:
+            raise RuntimeError(
+                "구글드라이브에서 내려받지 못했습니다. 공유 권한이 '링크가 있는 모든 사용자'인지"
+                " 확인하세요."
+            )
+        return _verify_media(dest)
 
     if src.startswith("http://") or src.startswith("https://"):
         return _download_link(src, out_dir)
