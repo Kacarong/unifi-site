@@ -21,11 +21,13 @@
 | 🎓 `scholarship` | 대학생 장학금 모음 + 관심 장학금 마감·다음 모집 디스코드 알림 | 서버 백그라운드 (추가 설치 없음) |
 | 🎖️ `wargame` | 2026·1980년 시작 국가 전략 게임 (실제 세계지도·실존 무기) | 프론트엔드 전용, 소스는 별도 저장소에서 빌드해 `~/wargame-site` 에 배포 (`WARGAME_DIST` 로 변경) |
 | 🏠 `housing` | LH·SH·GH·청약홈 임대·분양 공고 모음 + 필터에 맞는 새 공고 디스코드 알림 | 서버 렌더링 화면 + 서버 백그라운드 (`selectolax`·`jinja2`) |
+| 📈 `vstock` | 국내·미국 주식·코인 모의투자 (virtual-stock.kro.kr) | 바로가기만. 누르면 원래 서버로 이동 (`VSTOCK_URL` 로 변경), 사이트 수정·배포는 원래 저장소에서 하면 바로 반영 |
 
 원본 레포: [geoglobe](https://github.com/Kacarong/geoglobe) ·
 [ex-video](https://github.com/Kacarong/ex-video) ·
 [cgv-macro](https://github.com/Kacarong/cgv-macro) ·
-[housing-alert](https://github.com/Kacarong/housing-alert)
+[housing-alert](https://github.com/Kacarong/housing-alert) ·
+[virtual-stock-site-bot](https://github.com/Kacarong/virtual-stock-site-bot)
 
 ## 실행
 
