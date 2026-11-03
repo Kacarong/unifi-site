@@ -46,29 +46,47 @@ def region_words(profile: dict[str, Any]) -> list[str]:
     return [w.strip() for w in re.split(r"[,\s]+", profile.get("regions") or "") if w.strip()]
 
 
+# 자격 칸에서 지역 조건으로 읽을 문장 — 지명 옆에 이런 말이 있어야 한다
+_RESIDENCY = re.compile(r"소재|거주|주민등록|시민|도민|군민|구민|출신|관내|주소")
+
+
+def _special_places(item: dict[str, Any]) -> tuple[set[str], set[str]]:
+    """'서울 소재 대학 재학생' 처럼 지역 조건을 자격 칸에 적은 공고가 꽤 있다."""
+    sido: set[str] = set()
+    sigungu: set[str] = set()
+    for line in (item.get("special") or "").splitlines():
+        if _RESIDENCY.search(line):
+            a, b = regions.find(line)
+            sido |= a
+            sigungu |= b
+    return sido, sigungu
+
+
 def place(item: dict[str, Any]) -> tuple[str, set[str], set[str]]:
     """장학금의 거주 조건 → (종류, 시·도, 시·군·구).
 
     종류는 national(지역 무관) / places(어디인지 앎) / unknown(지역 조건은 있는데 어디인지 모름).
-    거주 조건 칸을 먼저 읽는다. 거기에 지명이 없을 때만 기관명을 본다
-    ('관내 거주' + '경상북도 의성군청'). '○ 전국' 처럼 전국이라고만 적혀 있으면
-    기관명에 지명이 있어도 지역 무관이다('부산은행 장학재단' 이 전국을 뽑을 수 있다).
+    읽는 순서: 지역 칸 → (전국이라고 적혀 있으면 지역 무관) → 자격 칸의 '○○ 소재·거주'
+    → 기관명('관내 거주' + '경상북도 의성군청'). 기관명은 지역 칸에 조건이 있거나
+    유형이 지역연고일 때만 본다('부산은행 장학재단' 이 전국을 뽑을 수 있다).
     """
     text = item.get("region") or ""
-    if _NO_REGION.match(text) and item.get("category") != "지역연고":
-        return "national", set(), set()
-    sido, sigungu = regions.find(text)
+    regional = item.get("category") == "지역연고" or not _NO_REGION.match(text)
     org_sido, org_sigungu = regions.find(item.get("org") or "")
-    if not sido and not sigungu:
-        if "전국" in text:
-            return "national", set(), set()
-        sido, sigungu = org_sido, org_sigungu
-    elif not sido:
-        sido = set(org_sido)  # '동구 관내 거주' + '(재)대구동구교육재단'
+    sido, sigungu = regions.find(text)
+    if sido or sigungu:
+        if not sido:
+            sido = set(org_sido)  # '동구 관내 거주' + '(재)대구동구교육재단'
+    elif "전국" in text:
+        return "national", set(), set()
+    else:
+        sido, sigungu = _special_places(item)
+        if not sido and not sigungu and regional:
+            sido, sigungu = org_sido, org_sigungu
     sido |= regions.sido_of(sigungu)
-    if not sido and not sigungu:
-        return "unknown", set(), set()
-    return "places", sido, sigungu
+    if sido or sigungu:
+        return "places", sido, sigungu
+    return ("unknown" if regional else "national"), set(), set()
 
 
 def is_regional(item: dict[str, Any]) -> bool:
@@ -131,15 +149,49 @@ def _pick_ok(choice: str, tokens: list[str], unknown: str) -> bool:
     return choice in tokens or bool((OPEN_TOKENS | {unknown}) & set(tokens))
 
 
-def matches(profile: dict[str, Any], item: dict[str, Any], strict: bool = False) -> bool:
-    """목록에서는 다른 지역이 확실할 때만 뺀다. 판단 못 한 지역 장학금은 '지역 확인 필요'
-    로 보여 준다. 알림(strict)에서는 그것까지 뺀다. 어느 읍·면 장학금인지 모르는 것을
-    새 장학금이라고 보내면 대부분 남의 동네 것이다."""
-    verdict = region_verdict(profile, item)
-    if verdict == "no" or (strict and verdict == "unknown"):
+# ---------------- 지원 용도 / 대출 ----------------
+# 지원 내용에 이런 말이 있으면 생활비로 쓰는 돈이다. 근로·멘토링 장학금은 시급으로 받는다.
+_LIVING = re.compile(
+    r"생활비|생활\s*장학|생활\s*지원|생활안정|생활보조|생활자금|생계|주거|월세|교통비|자기계발|도서구입"
+    r"|학업장려|학업보조|학습장려|장려금|활동비|활동지원금|시급"
+)
+_TUITION = re.compile(r"등록금|수업료|입학금|학비")
+_LOAN = re.compile(r"대출|대부|융자")
+
+
+def purpose(item: dict[str, Any]) -> str:
+    """living(생활비가 들어 있음) / tuition(등록금 전용) / unclear(금액만 적힘)."""
+    text = f"{item.get('name', '')} {item.get('support', '')}"
+    if _LIVING.search(text):
+        return "living"
+    if _TUITION.search(text):
+        return "tuition"
+    return "unclear"
+
+
+def is_loan(item: dict[str, Any]) -> bool:
+    """한국장학재단은 대출·대출이자 지원을 상품구분 '학자금' 으로 따로 둔다."""
+    return item.get("product") == "학자금" or bool(_LOAN.search(item.get("name") or ""))
+
+
+def _purpose_ok(choice: str, item: dict[str, Any]) -> bool:
+    if choice == "living":
+        return purpose(item) == "living"
+    if choice == "no_tuition":
+        return purpose(item) != "tuition"
+    return True
+
+
+def matches(profile: dict[str, Any], item: dict[str, Any]) -> bool:
+    """내 조건에 맞는가. 지역은 내 지역이거나 전국인 것만 — 어느 읍·면 것인지 모르는
+    장학금은 대부분 남의 동네 것이라 뺀다('내 조건만' 을 끄면 '지역 확인 필요' 로 보인다)."""
+    if region_verdict(profile, item) in ("no", "unknown"):
+        return False
+    if profile.get("exclude_loans", True) and is_loan(item):
         return False
     return (
-        _level_ok(profile.get("level", ""), item.get("grades") or [])
+        _purpose_ok(profile.get("purpose", ""), item)
+        and _level_ok(profile.get("level", ""), item.get("grades") or [])
         and _pick_ok(profile.get("school", ""), item.get("schools") or [], "특정대학")
         and _pick_ok(profile.get("field", ""), item.get("fields") or [], "특정학과")
     )
@@ -217,7 +269,7 @@ def plan_notifications(
         taken = {it["id"] for it in starred_new}
         batch = [
             it for it in fresh
-            if it["id"] not in taken and f"new:{it['id']}" not in sent and matches(profile, it, strict=True)
+            if it["id"] not in taken and f"new:{it['id']}" not in sent and matches(profile, it)
         ]
         if batch:
             batch.sort(key=lambda it: it.get("end", ""))

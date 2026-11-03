@@ -142,13 +142,55 @@ def test_regions() -> None:
     check("광주광역시 사람에게 광주광역시 장학금", v("○ 광주광역시 남구 거주", profile={"regions": "광주, 남구"}), "ok")
     check("강남구 안의 '남구' 를 따로 세지 않음", v("○ 서울 강남구 거주", profile={"regions": "부산, 남구"}), "no")
 
+    seoul_only = item("서울미래인재재단", "서울 장학", "2026-10-01", "2026-11-30", category="기타", region="해당없음")
+    seoul_only["special"] = "○ 대한민국 국적자\n○ 서울 소재 4년제 대학 정규학기 학부생"
+    check("지역 칸이 비어도 자격 칸의 '서울 소재' 를 읽음", logic.region_verdict(me, seoul_only), "no")
+    plain = item("전국재단", "자격만", "2026-10-01", "2026-11-30", category="기타", region="해당없음")
+    plain["special"] = "○ 서울대학교 재학생 중 성적 우수자"
+    check("'소재·거주' 같은 말 없이 지명만 나오면 지역 조건으로 안 봄", logic.region_verdict(me, plain), "na")
+
     eup = item("금왕장학회", "읍", "2026-10-01", "2026-11-30", category="지역연고", region="○ 금왕읍에 1년 이상 거주")
     check("읍·면 장학금은 판단 못 함", logic.region_verdict(me, eup), "unknown")
-    check("판단 못 한 것은 목록에는 보임", logic.matches(me, eup), True)
-    check("판단 못 한 것은 알림에서는 뺌", logic.matches(me, eup, strict=True), False)
+    check("판단 못 한 것은 내 조건에서 뺌 (내 지역 + 전국만)", logic.matches(me, eup), False)
     check("읍 이름을 적으면 통과", logic.region_verdict({"regions": "금왕읍"}, eup), "ok")
     check("시·군을 줄여 적은 공고도 내 시·군이면 통과",
           v("○ 1년 이상 계속하여 횡성에 주소", org="횡성인재육성장학회", profile={"regions": "강원, 횡성군"}), "ok")
+
+
+def test_purpose_and_loans() -> None:
+    print("지원 용도 / 대출")
+
+    def sup(text, name="장학생", product="장학금"):
+        it = item("재단", name, "2026-10-01", "2026-11-30")
+        it.update(support=text, product=product)
+        return it
+
+    living = sup("○ 200만원(생활비) ※등록금지원 장학금과 중복수혜 가능")
+    stipend = sup("○ 학기당 학업장려금 400만원")
+    work = sup("○ (26년 시급단가) 교내근로 10320원", name="국가근로장학금")
+    tuition = sup("○ 등록금 전액(학기당 최대 500만원)")
+    cash = sup("○ 100만원")
+    loan = sup("○ 연 200만 원", name="AI학업장려 학자금대출", product="학자금")
+    interest = sup("○ 대출이자 전액", name="대학생학자금대출이자지원", product="학자금")
+    check("생활비라고 적힌 것", logic.purpose(living), "living")
+    check("학업장려금도 생활비", logic.purpose(stipend), "living")
+    check("근로 시급도 생활비", logic.purpose(work), "living")
+    check("등록금 전용", logic.purpose(tuition), "tuition")
+    check("금액만 적힌 것", logic.purpose(cash), "unclear")
+
+    only_living = {"purpose": "living"}
+    check("생활비만: 생활비 통과", logic.matches(only_living, living), True)
+    check("생활비만: 등록금 전용 뺌", logic.matches(only_living, tuition), False)
+    check("생활비만: 용도 모름 뺌", logic.matches(only_living, cash), False)
+    no_tuition = {"purpose": "no_tuition"}
+    check("등록금 전용만 빼기: 용도 모름은 남김", logic.matches(no_tuition, cash), True)
+    check("등록금 전용만 빼기: 등록금 전용 뺌", logic.matches(no_tuition, tuition), False)
+
+    check("학자금 대출은 대출", logic.is_loan(loan), True)
+    check("대출이자 지원도 대출 관련", logic.is_loan(interest), True)
+    check("장학금은 대출 아님", logic.is_loan(living), False)
+    check("기본으로 대출을 뺌", logic.matches({}, loan), False)
+    check("대출 빼기를 끄면 보임", logic.matches({"exclude_loans": False}, loan), True)
 
 
 def test_forecast() -> None:
@@ -253,6 +295,7 @@ def main() -> int:
         test_parse()
         test_matches()
         test_regions()
+        test_purpose_and_loans()
         test_forecast()
         test_notifications()
     finally:

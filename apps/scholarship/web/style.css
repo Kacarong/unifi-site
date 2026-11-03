@@ -95,6 +95,7 @@ label.check { font-size: 13.5px; }
 .badge.hot { color: var(--err); border-color: rgba(255, 107, 127, 0.45); }
 .badge.warn { color: var(--warn); border-color: rgba(245, 185, 92, 0.38); }
 .badge.off { color: var(--dim); }
+.chip.ok { color: var(--ok); border-color: rgba(79, 211, 157, 0.38); }
 .chip.warn { color: var(--warn); border-color: rgba(245, 185, 92, 0.38); }
 .chip.dim { color: var(--dim); border-style: dashed; }
 

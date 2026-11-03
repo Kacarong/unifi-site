@@ -36,8 +36,8 @@
       <details id="profileBox" class="panel reveal">
         <summary><h2>내 조건</h2><span id="profileSummary" class="tiny muted"></span></summary>
         <div class="field-grid form">
-          <label>사는 곳·학교 있는 곳
-            <input id="p_regions" type="text" placeholder="부산, 해운대구" autocomplete="off" />
+          <label>지역 (내 지역 + 전국 장학금이 나옵니다)
+            <input id="p_regions" type="text" placeholder="부산" autocomplete="off" />
           </label>
           <label>과정
             <select id="p_level"><option value="">상관없음</option></select>
@@ -48,11 +48,21 @@
           <label>계열
             <select id="p_field"><option value="">상관없음</option></select>
           </label>
+          <label>지원 용도
+            <select id="p_purpose">
+              <option value="">상관없음</option>
+              <option value="living">생활비 장학금만 (생활비라고 적힌 것)</option>
+              <option value="no_tuition">등록금 전용만 빼기 (용도 안 적힌 것 포함)</option>
+            </select>
+          </label>
+          <label class="check"><input id="p_noloan" type="checkbox" checked /> 학자금 대출·대출이자 지원 빼기</label>
         </div>
         <p class="tiny muted hint">
-          시·도와 시·군·구를 함께 적으면 잘 맞습니다(예: <b>부산, 해운대구</b>). 공고가 시·군·구까지
-          정해 두었으면 시·군·구가, 시·도까지만 정했으면 시·도가 맞아야 보입니다. 읍·면 단위
-          장학금처럼 어디 것인지 알 수 없는 것은 <b>지역 확인 필요</b>로 표시합니다.
+          <b>부산</b>이라고 적으면 부산 장학금과 전국 대상 장학금만 나옵니다. 구까지 적으면
+          (예: <b>부산, 해운대구</b>) 다른 구 전용 장학금도 빠집니다. 어느 지역 것인지 알 수 없는
+          읍·면 장학금은 빼고, "내 조건만"을 끄면 <b>지역 확인 필요</b>로 보입니다.
+          지원 내용에 금액만 적히고 용도가 없는 장학금이 많습니다. 그런 것까지 보려면 지원 용도를
+          "등록금 전용만 빼기"로 고르세요.
           소득·성적 기준은 공고마다 적는 방식이 달라 거르지 않습니다. 원문에서 확인하세요.
         </p>
         <div class="btns"><button id="profileSave" class="btn primary">저장</button></div>

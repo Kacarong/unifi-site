@@ -59,8 +59,11 @@ async function loadStatus() {
 }
 
 // ---------------- 내 조건 ----------------
+const PURPOSE_LABEL = { living: '생활비만', no_tuition: '등록금 전용 제외' };
+
 function profileSummary(p) {
-  const parts = [p.regions, p.level, p.school, p.field].filter(Boolean);
+  const parts = [p.regions ? `${p.regions}+전국` : '', p.level, p.school, p.field,
+    PURPOSE_LABEL[p.purpose] || '', p.exclude_loans ? '대출 제외' : ''].filter(Boolean);
   return parts.length ? parts.join(' · ') : '아직 안 정했어요 — 정하면 맞는 것만 보여 드립니다';
 }
 
@@ -71,6 +74,8 @@ async function loadProfile() {
   $('p_level').value = p.level || '';
   $('p_school').value = p.school || '';
   $('p_field').value = p.field || '';
+  $('p_purpose').value = p.purpose || '';
+  $('p_noloan').checked = p.exclude_loans !== false;
   $('profileSummary').textContent = profileSummary(p);
   if (!p.regions && !p.level && !p.school && !p.field) $('profileBox').open = true;
 }
@@ -84,6 +89,8 @@ async function saveProfile() {
       level: $('p_level').value,
       school: $('p_school').value,
       field: $('p_field').value,
+      purpose: $('p_purpose').value,
+      exclude_loans: $('p_noloan').checked,
     }));
     state.profile = p;
     $('profileSummary').textContent = profileSummary(p);
@@ -226,6 +233,9 @@ function card(it) {
   if (it.category && it.category !== '해당없음') badges.append(el('span', 'chip', it.category));
   if (it.region_check) badges.append(el('span', 'chip warn', '지역 확인 필요'));
   else if (it.regional) badges.append(el('span', 'chip', '지역'));
+  if (it.loan) badges.append(el('span', 'chip', '대출'));
+  else if (it.purpose === 'living') badges.append(el('span', 'chip ok', '생활비'));
+  else if (it.purpose === 'tuition') badges.append(el('span', 'chip', '등록금'));
   if (!it.mine) badges.append(el('span', 'chip dim', '조건 밖'));
   c.append(head, badges);
   if (it.support) c.append(el('p', 'support', it.support));

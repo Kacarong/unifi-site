@@ -19,6 +19,8 @@ class ProfilePatch(BaseModel):
     level: Optional[str] = None
     school: Optional[str] = None
     field: Optional[str] = None
+    purpose: Optional[str] = None
+    exclude_loans: Optional[bool] = None
 
 
 class SettingsPatch(BaseModel):
@@ -81,7 +83,10 @@ def get_profile() -> dict[str, Any]:
 
 @router.patch("/profile")
 def patch_profile(body: ProfilePatch) -> dict[str, Any]:
-    return store.update_profile({k: v.strip() for k, v in body.model_dump().items() if v is not None})
+    patch = {k: v.strip() if isinstance(v, str) else v for k, v in body.model_dump().items() if v is not None}
+    if patch.get("purpose") not in (None, "", "living", "no_tuition"):
+        raise HTTPException(400, "purpose 는 '', living, no_tuition 중 하나")
+    return store.update_profile(patch)
 
 
 def _public_settings() -> dict[str, Any]:
@@ -145,6 +150,8 @@ def _slim(it: dict[str, Any], today, stars: set[str], profile: dict[str, Any]) -
         mine=logic.matches(profile, it),
         regional=logic.is_regional(it),
         region_check=logic.region_verdict(profile, it) == "unknown",
+        purpose=logic.purpose(it),
+        loan=logic.is_loan(it),
         support=" · ".join(support)[:140],
     )
     return out

@@ -24,6 +24,8 @@ DEFAULT_PROFILE: dict[str, Any] = {
     "level": "",     # "" | 신입생 | 재학생 | 대학원
     "school": "",    # "" | SCHOOL_VOCAB 중 하나
     "field": "",     # "" | FIELD_VOCAB 중 하나
+    "purpose": "",   # "" | living(생활비라고 적힌 것만) | no_tuition(등록금 전용만 빼기)
+    "exclude_loans": True,  # 학자금 대출·대출이자 지원은 장학금이 아니다
 }
 
 DEFAULT_SETTINGS: dict[str, Any] = {
