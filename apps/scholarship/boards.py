@@ -394,7 +394,8 @@ def collect(boards: list[dict[str, Any]] | None = None, today: dt.date | None = 
             posted = got["posted"]
             if posted and (today - posted).days > RECENT_DAYS:
                 continue  # 목록엔 날짜가 없었지만 글을 열어 보니 오래된 글
-            start = got["start"] or posted
+            # 마감일을 못 읽었으면 시작일도 비운다 — 게시일을 시작일로 넣으면 '신청 가능' 처럼 보인다
+            start = got["start"] or (posted if got["end"] else None)
             end = got["end"]
             if end and (today - end).days > CLOSED_KEEP_DAYS:
                 continue  # 오래 지난 회차 ('최근 마감' 탭보다 오래된 것)
@@ -420,6 +421,8 @@ def collect(boards: list[dict[str, Any]] | None = None, today: dt.date | None = 
                 "end": end.isoformat() if end else "",
                 "support": got["excerpt"],
                 "source": board["label"],
+                "source_id": board["id"],
+                "school_board": bool(board.get("loose")),
                 "notice_title": title,
                 "posted": posted.isoformat() if posted else "",
                 "period_from": got["where"],

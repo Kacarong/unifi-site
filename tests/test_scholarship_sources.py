@@ -265,12 +265,56 @@ def test_merge() -> None:
           [f["org"] for f in logic.forecast(out, D("2026-10-01"))], [])
 
 
+def test_review_regressions() -> None:
+    print("학교 게시판 공고끼리 합치지 않기 · 못 본 공고 남기기 · 일정 미확인")
+    from apps.scholarship import worker
+
+    def notice(title, start, end, sid="pknu_civil", school=True, posted="2026-10-01"):
+        it = item("부경대학교 토목공학과", title, start, end)
+        return {**it, "notice_title": title, "url": f"https://civil.pknu.ac.kr/{it['id']}", "posted": posted,
+                "source": "부경대 토목공학과", "source_id": sid, "school_board": school}
+
+    a = notice("2026학년도 부경 더채움 장학금", "2026-09-01", "2026-12-31")
+    b = notice("푸른등대 기부장학금 선발 안내", "2026-10-22", "2026-12-31")
+    csv_school = item("부경대학교 토목공학과", "동문회 장학금", "2026-09-01", "2026-12-31")
+    out = logic.merge([csv_school], [a, b])
+    check("같은 학교·같은 마감이어도 서로 다른 장학금은 따로", sorted(x.get("notice_title", x["name"]) for x in out),
+          ["2026학년도 부경 더채움 장학금", "동문회 장학금", "푸른등대 기부장학금 선발 안내"])
+    check("학교 공고를 학교의 다른 장학금 회차로 묶지 않음", {x["series"] for x in out if x.get("notice_title")},
+          {a["series"], b["series"]})
+
+    old = notice("정효택 장학생 선발 계획", "2026-10-14", "2026-10-19")
+    too_old = notice("작년 장학생 선발", "2026-02-01", "2026-03-01")
+    off = notice("끈 게시판 공고", "2026-10-01", "2026-11-20", sid="wooyang")
+    legacy = {k: v for k, v in notice("예전 자료(출처 id 없음)", "2026-10-01", "2026-11-20").items() if k != "source_id"}
+    kept = worker.keep_previous([old, too_old, off, legacy], [a], TODAY,
+                                lambda it: (it.get("source_id") or "pknu_civil") == "pknu_civil")
+    check("이번에 못 본 공고도 남기고, 오래된 것·끈 게시판 것만 뺌",
+          [x["notice_title"] for x in kept], ["2026학년도 부경 더채움 장학금", "정효택 장학생 선발 계획", "예전 자료(출처 id 없음)"])
+    check("게시판을 못 읽은 회차(빈 결과)에도 이전 공고는 그대로",
+          len(worker.keep_previous([a, b], [], TODAY)), 2)
+
+    fetcher = FakeFetcher({
+        "no=1": '<p>작성일 2026-10-30</p><p><img src="/poster.jpg"></p>'.encode(),
+        "list": '<table><tr><td><a href="/b?no=1">2026 부경 장학생 선발 안내</a></td><td>2026-10-30</td></tr></table>'.encode(),
+    })
+    got = boards.collect([{"id": "pknu_civil", "label": "부경대 토목공학과", "org": "부경대학교 토목공학과",
+                           "url": "https://civil.pknu.ac.kr/list", "loose": True}], today=TODAY, fetcher=fetcher)
+    check("이미지뿐인 공고는 시작·마감을 비워 둠", [(g["start"], g["end"], g["posted"]) for g in got],
+          [("", "", "2026-10-30")])
+    check("마감을 모르면 '일정 미확인'", logic.status(got[0], TODAY), "unknown")
+    notes = logic.plan_notifications(got, profile={}, settings={"notify_new": True, "reminder_days": [7]},
+                                     stars=[got[0]["series"]], known_ids=set(), sent=set(), today=TODAY)
+    check("일정 미확인 공고는 새 장학금·관심 알림 모두 안 보냄", notes, [])
+
+
 def main() -> int:
     test_find_period()
     test_text_of()
     test_boards()
     test_kosaf()
     test_merge()
+    test_review_regressions()
     if FAILURES:
         print(f"\n실패 {len(FAILURES)}건")
         return 1

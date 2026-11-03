@@ -144,6 +144,13 @@ def base_items() -> list[dict[str, Any]]:
         return _base or []
 
 
+def extra_items() -> list[dict[str, Any]]:
+    """포털·게시판에서 모아 둔 것 그대로(합치기 전)."""
+    with _lock:
+        _merged()
+        return list(_extras or [])
+
+
 def replace_items(new_items: list[dict[str, Any]]) -> None:
     global _items, _base
     with _lock:

@@ -13,7 +13,7 @@ from .worker import build_message, now_kst, post_discord, sync, sync_extra, work
 
 router = APIRouter()
 
-VIEWS = ("open", "year_round", "soon", "closed", "starred", "all")
+VIEWS = ("open", "year_round", "soon", "closed", "unknown", "starred", "all")
 
 
 class ProfilePatch(BaseModel):
@@ -155,7 +155,7 @@ def _slim(it: dict[str, Any], today, stars: set[str], profile: dict[str, Any]) -
     out = {
         k: it.get(k, "")
         for k in ("id", "series", "org", "name", "org_type", "category", "start", "end", "url",
-                  "expected_start", "expected_end", "started", "source", "period_from", "notice_url", "notice_title")
+                  "expected_start", "expected_end", "started", "source", "posted", "period_from", "notice_url", "notice_title")
         if k in it
     }
     out.update(
@@ -193,9 +193,12 @@ def _view(view: str, items: list[dict[str, Any]], today, stars: set[str]) -> lis
         return logic.forecast(items, today)
     if view == "closed":
         return logic.recently_closed(items, today)
+    if view == "unknown":
+        rows = [it for it in items if logic.status(it, today) == "unknown"]
+        return sorted(rows, key=lambda it: it.get("posted", ""), reverse=True)
     if view == "starred":
         latest = logic.latest_rounds(it for it in items if it["series"] in stars)
-        order = {"open": 0, "year_round": 1, "upcoming": 2, "closed": 3}
+        order = {"open": 0, "year_round": 1, "upcoming": 2, "unknown": 3, "closed": 4}
         return sorted(latest.values(), key=lambda it: (order[logic.status(it, today)], it.get("end", "")))
     return sorted(items, key=lambda it: it.get("start", ""), reverse=True)
 

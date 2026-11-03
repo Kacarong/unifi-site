@@ -51,32 +51,63 @@ def sync(force: bool = False) -> dict[str, Any]:
         raise
 
 
+KEEP_DAYS = 180  # 모아 둔 공고는 마감이 이만큼 지날 때까지 남긴다('최근 마감' 탭과 같은 기간)
+
+
+def _still_relevant(it: dict[str, Any], today: dt.date) -> bool:
+    end = logic.parse_date(it.get("end", ""))
+    if end:
+        return (today - end).days <= KEEP_DAYS
+    posted = logic.parse_date(it.get("posted", ""))
+    return bool(posted) and (today - posted).days <= boards.RECENT_DAYS
+
+
+def keep_previous(prev: list[dict[str, Any]], fresh: list[dict[str, Any]], today: dt.date,
+                  allowed=lambda it: True) -> list[dict[str, Any]]:
+    """이번에 다시 못 본 공고도 지우지 않는다. 게시판 첫 쪽에서 밀려났거나, 사이트가 잠깐
+    안 열렸거나, 포털 최근 쪽에서 내려갔을 뿐이다. 이번에 다시 본 것(같은 id)은 새 내용으로."""
+    ids = {it["id"] for it in fresh}
+    return fresh + [it for it in prev if it["id"] not in ids and allowed(it) and _still_relevant(it, today)]
+
+
 def sync_extra(today: dt.date | None = None) -> dict[str, Any]:
     """CSV 에 아직 없는 장학금을 포털·게시판에서 모은다. 한쪽이 실패해도 다른 쪽은 남긴다."""
     today = today or now_kst().date()
     base = store.base_items()
     known = {(it["org"], it["name"], it.get("end", "")) for it in base}
     errors: list[str] = []
-    prev = store.items()
-    prev_extra = [it for it in prev if it.get("source")]
+    prev = store.extra_items()
+    prev_portal = [it for it in prev if not it.get("notice_title")]
+    prev_notices = [it for it in prev if it.get("notice_title")]
 
     cache = store.kosaf_cache()
+    portal: list[dict[str, Any]] = []
     try:
         portal = kosaf.collect(known, cache, today)
         # 캐시는 최근 것만 남긴다 — 마감이 오래 지난 것은 다시 볼 일이 없다
-        cutoff = (today - dt.timedelta(days=90)).isoformat()
+        cutoff = (today - dt.timedelta(days=KEEP_DAYS)).isoformat()
         store.save_kosaf_cache({k: v for k, v in cache.items() if (v.get("end") or "9") >= cutoff})
     except source.SourceError as exc:
         errors.append(str(exc))
-        portal = [it for it in prev_extra if it.get("source") == "한국장학재단 포털"]
+    portal = keep_previous(prev_portal, portal, today)
 
+    state = store.snapshot()
+    active = boards.active_sources(state)
+    active_ids = {b["id"] for b in active}
+    label_to_id = {b["label"]: b["id"] for b in boards.all_sources(state)}
+
+    def from_active(it: dict[str, Any]) -> bool:
+        # 끄거나 지운 게시판의 공고는 남기지 않는다(예전 자료는 source_id 가 없어 이름으로 찾는다)
+        return (it.get("source_id") or label_to_id.get(it.get("source", ""))) in active_ids
+
+    notices: list[dict[str, Any]] = []
     try:
         stats: dict[str, dict[str, Any]] = {}
-        notices = boards.collect(boards.active_sources(store.snapshot()), today=today, log=log, stats=stats)
+        notices = boards.collect(active, today=today, log=log, stats=stats)
         store.update({"source_stats": {k: {**v, "at": time.time()} for k, v in stats.items()}})
     except Exception as exc:  # noqa: BLE001 - 게시판 쪽 예외로 포털 결과까지 잃지 않는다
         errors.append(f"공고 게시판: {exc}")
-        notices = [it for it in prev_extra if it.get("notice_title") and it.get("source") != "한국장학재단 포털"]
+    notices = keep_previous(prev_notices, notices, today, from_active)
 
     store.replace_extras(portal + notices)
     store.update({"last_extra_at": time.time(), "extra_error": " / ".join(errors)})
@@ -115,6 +146,8 @@ def _line(it: dict[str, Any], today: dt.date) -> str:
         when += f" (D-{left})" if left else " (오늘 마감)"
     if logic.status(it, today) == "upcoming":
         when = f"{it['start'][5:].replace('-', '/')} 모집 시작"
+    elif logic.status(it, today) == "unknown":
+        when = "일정 미확인 · 공고 원문 확인"
     elif logic.status(it, today) == "year_round":
         when = f"연중 사업(~{it['end'][:10].replace('-', '/')}) · 지금 신청받는지는 공고 확인"
     if it.get("source"):

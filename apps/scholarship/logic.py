@@ -35,8 +35,14 @@ YEAR_ROUND_DAYS = 300
 
 
 def status(item: dict[str, Any], today: dt.date) -> str:
-    """upcoming | open | year_round | closed"""
+    """upcoming | open | year_round | closed | unknown
+
+    unknown: 마감일을 모른다. 게시판 공고 중 본문이 이미지뿐이거나 첨부에서도 날짜를 못
+    읽은 것 — 지금 신청할 수 있는지 알 수 없으니 '신청 가능' 에도 알림에도 넣지 않는다.
+    """
     start, end = parse_date(item.get("start", "")), parse_date(item.get("end", ""))
+    if not end:
+        return "unknown"
     if start and today < start:
         return "upcoming"
     if end and today > end:
@@ -253,20 +259,31 @@ def merge(base: list[dict[str, Any]], extras: list[dict[str, Any]]) -> list[dict
         series_of.setdefault(org_core(it.get("org", "")), set()).add((it["series"], it["name"]))
     ids = {it["id"] for it in out}
     rounds = {(it["series"], it.get("end", "")) for it in out}
+    # 공고와 견줄 대상은 구조화된 자료(CSV·포털)뿐이다. 게시판 공고끼리는 합치지 않는다 —
+    # 같은 학교 게시판의 더채움·푸른등대가 마감일이 같다고 한 장학금이 되면 안 된다.
     by_org_end: dict[tuple[str, str], int] = {}
     by_end: dict[str, list[int]] = {}
-    for i, it in enumerate(out):
+
+    def index(i: int, it: dict[str, Any]) -> None:
+        if it.get("notice_title") and it.get("source_id"):
+            return
         by_org_end.setdefault((org_core(it.get("org", "")), it.get("end", "")), i)
         by_end.setdefault(it.get("end", ""), []).append(i)
 
+    for i, it in enumerate(out):
+        index(i, it)
+
     def same_notice(it: dict[str, Any]) -> int | None:
-        """학교 게시판이 다시 올린 외부 공고('부산지역인재 장학금 … 신청 공고') — 마감이 같고
-        제목에 원래 장학금 이름이나 기관명이 들어 있으면 같은 공고다."""
+        """이미 있는 장학금을 다시 알린 공고인가.
+        - 재단·학회 게시판: 기관과 마감일이 같으면 같은 공고(재단 공고는 보통 장학금 하나).
+        - 학교 게시판은 기관이 늘 학교라 기관으로는 못 가린다. 마감이 같고 제목에 원래
+          장학금 이름이나 기관명이 들어 있어야 같은 공고('부산지역인재 장학금 … 신청 공고')."""
         if not it.get("end"):
             return None
-        hit = by_org_end.get((org_core(it.get("org", "")), it["end"]))
-        if hit is not None:
-            return hit
+        if not it.get("school_board"):
+            hit = by_org_end.get((org_core(it.get("org", "")), it["end"]))
+            if hit is not None:
+                return hit
         title = re.sub(r"\s+", "", it.get("notice_title", ""))
         for i in by_end.get(it["end"], []):
             name, org = re.sub(r"\s+", "", out[i].get("name", "")), org_core(out[i].get("org", ""))
@@ -283,7 +300,7 @@ def merge(base: list[dict[str, Any]], extras: list[dict[str, Any]]) -> list[dict
                         "period_from": it.get("period_from", "")}
             continue
         same_org = series_of.get(org_core(it.get("org", "")), set())
-        if it.get("notice_title") and len(same_org) == 1:
+        if it.get("notice_title") and not it.get("school_board") and len(same_org) == 1:
             series, name = next(iter(same_org))
             it = {**it, "series": series, "name": name}
         if (it["series"], it.get("end", "")) in rounds:
@@ -291,8 +308,7 @@ def merge(base: list[dict[str, Any]], extras: list[dict[str, Any]]) -> list[dict
         out.append(it)
         ids.add(it["id"])
         rounds.add((it["series"], it.get("end", "")))
-        by_org_end.setdefault((org_core(it.get("org", "")), it.get("end", "")), len(out) - 1)
-        by_end.setdefault(it.get("end", ""), []).append(len(out) - 1)
+        index(len(out) - 1, it)
     return out
 
 
@@ -375,7 +391,8 @@ def plan_notifications(
     """
     star_set = set(stars)
     out: list[dict[str, Any]] = []
-    live = [it for it in items if status(it, today) != "closed" and not excluded(profile, it)]
+    # 마감을 모르는 공고(unknown)는 알리지 않는다 — 이미 끝났을 수 있다
+    live = [it for it in items if status(it, today) not in ("closed", "unknown") and not excluded(profile, it)]
     fresh = [it for it in live if it["id"] not in known_ids]
 
     starred_new = []
