@@ -298,17 +298,23 @@ def attachments(page: str, base_url: str) -> list[tuple[str, str]]:
 _AMOUNT = re.compile(r"\d[\d,]*\s*만\s*원|생활비|생활\s*지원|학업\s*장려|등록금")
 
 
+_LIVING_LINE = re.compile(r"생활비|생활\s*지원|생활\s*장학|학업\s*장려|생활안정")
+
+
 def _excerpt(text: str) -> str:
     """지원 내용으로 보일 줄 몇 개 — 목록 요약과 '지원 용도'(생활비·등록금) 판정에 쓴다.
-    금액이나 용도 낱말이 든 짧은 줄만 고른다(재단 소개 문단은 빼려고)."""
-    lines = []
+    금액이나 용도 낱말이 든 짧은 줄만 고르고(재단 소개 문단은 빼려고), 생활비를 말하는 줄을
+    앞에 둔다 — 공고 앞부분의 '등록금 납부' 같은 줄 때문에 등록금 전용으로 잘못 보이지 않게."""
+    living, other = [], []
     for ln in text.splitlines():
         ln = re.sub(r"\s+", " ", ln).strip()
-        if 4 <= len(ln) <= 90 and _AMOUNT.search(ln) and not re.search(r"중지|환수|제외|불가", ln):
-            lines.append("○ " + ln)
-        if len(lines) >= 3:
-            break
-    return "\n".join(lines)
+        if not (4 <= len(ln) <= 90) or re.search(r"중지|환수|제외|불가", ln):
+            continue
+        if _LIVING_LINE.search(ln):
+            living.append("○ " + ln)
+        elif _AMOUNT.search(ln):
+            other.append("○ " + ln)
+    return "\n".join((living[:2] + other)[:3])
 
 
 def _key(*parts: str) -> str:

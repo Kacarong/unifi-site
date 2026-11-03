@@ -182,8 +182,10 @@ def _search(items: list[dict[str, Any]], q: str) -> list[dict[str, Any]]:
 
 def _view(view: str, items: list[dict[str, Any]], today, stars: set[str]) -> list[dict[str, Any]]:
     if view == "open":
-        rows = [it for it in items if logic.status(it, today) == "open"]
-        return sorted(rows, key=lambda it: it.get("end", ""))
+        # 지금 받는 것(마감 가까운 순) 다음에, 날짜가 확정된 곧 시작할 것(시작 빠른 순)
+        rows = sorted((it for it in items if logic.status(it, today) == "open"), key=lambda it: it.get("end", ""))
+        soon = sorted((it for it in items if logic.status(it, today) == "upcoming"), key=lambda it: it.get("start", ""))
+        return rows + soon
     if view == "year_round":
         rows = [it for it in items if logic.status(it, today) == "year_round"]
         return sorted(rows, key=lambda it: it.get("end", ""))
