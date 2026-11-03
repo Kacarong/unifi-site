@@ -283,6 +283,21 @@ def test_review_regressions() -> None:
     check("학교 공고를 학교의 다른 장학금 회차로 묶지 않음", {x["series"] for x in out if x.get("notice_title")},
           {a["series"], b["series"]})
 
+    # 리뷰 재현: 같은 학교 기관명의 CSV 장학금 + 제목에 학교 이름이 든 학교 공고 둘, 마감일 모두 같음
+    alumni = item("부경대학교", "동문회 장학금", "2026-10-01", "2026-11-30")
+    def school(title):
+        return {**notice(title, "2026-10-15", "2026-11-30"), "org": "부경대학교"}
+    fill, light = school("부경대학교 더채움 장학금 안내"), school("부경대학교 푸른등대 기부장학금 안내")
+    out = logic.merge([alumni], [fill, light])
+    check("학교 이름만 같다고 같은 장학금으로 합치지 않음(3건 그대로)", len(out), 3)
+    check("CSV 장학금에 엉뚱한 공고 링크가 붙지 않음", out[0].get("notice_url"), None)
+    # 외부 기관 공고 재게시는 그대로 붙되, 한 항목에 두 번째 공고는 붙지 않음
+    busan = item("부산광역시청", "부산지역인재 장학금", "2026-10-14", "2026-10-28")
+    r1 = {**school("2026년 부산지역인재 장학금 생활장학금 신청 공고"), "end": "2026-10-28"}
+    r2 = {**school("부산광역시청 부산지역인재 장학금 추가 안내"), "end": "2026-10-28"}
+    out = logic.merge([busan], [r1, r2])
+    check("한 장학금에는 공고 하나만, 나머지는 따로", (len(out), out[0].get("notice_url")), (2, r1["url"]))
+
     old = notice("정효택 장학생 선발 계획", "2026-10-14", "2026-10-19")
     too_old = notice("작년 장학생 선발", "2026-02-01", "2026-03-01")
     off = notice("끈 게시판 공고", "2026-10-01", "2026-11-20", sid="wooyang")

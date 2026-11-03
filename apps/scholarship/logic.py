@@ -272,6 +272,7 @@ def merge(base: list[dict[str, Any]], extras: list[dict[str, Any]]) -> list[dict
 
     for i, it in enumerate(out):
         index(i, it)
+    attached: set[int] = set()  # 이번 병합에서 이미 공고가 붙은 항목
 
     def same_notice(it: dict[str, Any]) -> int | None:
         """이미 있는 장학금을 다시 알린 공고인가.
@@ -280,14 +281,21 @@ def merge(base: list[dict[str, Any]], extras: list[dict[str, Any]]) -> list[dict
           장학금 이름이나 기관명이 들어 있어야 같은 공고('부산지역인재 장학금 … 신청 공고')."""
         if not it.get("end"):
             return None
+        mine = org_core(it.get("org", ""))
         if not it.get("school_board"):
-            hit = by_org_end.get((org_core(it.get("org", "")), it["end"]))
-            if hit is not None:
+            hit = by_org_end.get((mine, it["end"]))
+            if hit is not None and hit not in attached:
                 return hit
         title = re.sub(r"\s+", "", it.get("notice_title", ""))
         for i in by_end.get(it["end"], []):
+            if i in attached:
+                continue  # 한 장학금에는 공고 하나만 — 두 번째 공고가 첫 공고 링크를 덮지 않게
             name, org = re.sub(r"\s+", "", out[i].get("name", "")), org_core(out[i].get("org", ""))
-            if len(name) >= 5 and name in title or len(org) >= 4 and org in title:
+            if len(name) >= 5 and name in title:
+                return i
+            # 기관명으로 보는 건 학교가 '다른' 기관의 공고를 다시 올렸을 때만. 같은 학교 장학금은
+            # 제목에 학교 이름이 늘 들어 있어서 기관명으로는 서로 다른 장학금을 가릴 수 없다.
+            if org != mine and len(org) >= 4 and org in title:
                 return i
         return None
     # 포털(구조화된 자료)을 게시판보다 먼저 — 같은 공고면 포털 쪽을 남긴다
@@ -296,6 +304,7 @@ def merge(base: list[dict[str, Any]], extras: list[dict[str, Any]]) -> list[dict
             continue
         hit = same_notice(it) if it.get("notice_title") else None
         if hit is not None:
+            attached.add(hit)
             out[hit] = {**out[hit], "notice_url": it["url"], "notice_title": it["notice_title"],
                         "period_from": it.get("period_from", "")}
             continue
