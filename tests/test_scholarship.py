@@ -214,6 +214,22 @@ def test_purpose_and_loans() -> None:
     check("관심이어도 대출은 제외 대상", logic.excluded(me, soon_loan), True)
 
 
+def test_year_round() -> None:
+    print("연중 사업")
+    # 국가근로장학금은 사업 기간(3/1~다음 해 2/28)으로 올라오지만 2학기 신청은 9/9에 끝났다
+    work = item("(재)한국장학재단", "국가근로장학금", "2026-03-01", "2027-02-28")
+    camp = item("(재)한국장학재단", "재능봉사 캠프", "2026-11-01", "2026-12-31")
+    check("1년 가까운 공고 기간은 '신청 가능' 이 아니라 연중 사업",
+          (logic.status(work, TODAY), logic.status(camp, TODAY)), ("year_round", "open"))
+    check("연중 사업도 기간이 지나면 마감",
+          logic.status(work, dt.date(2027, 3, 1)), "closed")
+    notes = logic.plan_notifications(
+        [work], profile={}, settings={"reminder_days": [7, 3, 1]}, stars=[work["series"]],
+        known_ids={work["id"]}, sent=set(), today=dt.date(2027, 2, 25),
+    )
+    check("연중 사업은 관심이어도 '마감 D-3' 알림을 보내지 않음", notes, [])
+
+
 def test_forecast() -> None:
     print("곧 열릴 장학금")
     last_year = item("재단A", "가을 장학", "2025-11-10", "2025-11-30")
@@ -317,6 +333,7 @@ def main() -> int:
         test_matches()
         test_regions()
         test_purpose_and_loans()
+        test_year_round()
         test_forecast()
         test_notifications()
     finally:

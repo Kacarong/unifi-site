@@ -27,12 +27,22 @@ def parse_date(text: str) -> dt.date | None:
         return None
 
 
+# 공고 기간이 이만큼 길면 '신청 기간' 이 아니라 사업 기간일 때가 많다.
+# 예: 국가근로장학금은 2026-03-01~2027-02-28 로 올라오지만 실제 신청은
+# 학기마다 한 달쯤만 받는다(2026년 2학기는 9/9 마감). 이런 건 '신청 가능' 으로
+# 단정하지 않고 '연중 사업' 으로 따로 보여 준다.
+YEAR_ROUND_DAYS = 300
+
+
 def status(item: dict[str, Any], today: dt.date) -> str:
+    """upcoming | open | year_round | closed"""
     start, end = parse_date(item.get("start", "")), parse_date(item.get("end", ""))
     if start and today < start:
         return "upcoming"
     if end and today > end:
         return "closed"
+    if start and end and (end - start).days >= YEAR_ROUND_DAYS:
+        return "year_round"
     return "open"
 
 

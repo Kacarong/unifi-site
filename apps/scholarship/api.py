@@ -11,7 +11,7 @@ from .worker import build_message, now_kst, post_discord, sync, worker
 
 router = APIRouter()
 
-VIEWS = ("open", "soon", "starred", "all")
+VIEWS = ("open", "year_round", "soon", "starred", "all")
 
 
 class ProfilePatch(BaseModel):
@@ -169,11 +169,14 @@ def _view(view: str, items: list[dict[str, Any]], today, stars: set[str]) -> lis
     if view == "open":
         rows = [it for it in items if logic.status(it, today) == "open"]
         return sorted(rows, key=lambda it: it.get("end", ""))
+    if view == "year_round":
+        rows = [it for it in items if logic.status(it, today) == "year_round"]
+        return sorted(rows, key=lambda it: it.get("end", ""))
     if view == "soon":
         return logic.forecast(items, today)
     if view == "starred":
         latest = logic.latest_rounds(it for it in items if it["series"] in stars)
-        order = {"open": 0, "upcoming": 1, "closed": 2}
+        order = {"open": 0, "year_round": 1, "upcoming": 2, "closed": 3}
         return sorted(latest.values(), key=lambda it: (order[logic.status(it, today)], it.get("end", "")))
     return sorted(items, key=lambda it: it.get("start", ""), reverse=True)
 

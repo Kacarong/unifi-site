@@ -79,6 +79,8 @@ def _line(it: dict[str, Any], today: dt.date) -> str:
         when += f" (D-{left})" if left else " (오늘 마감)"
     if logic.status(it, today) == "upcoming":
         when = f"{it['start'][5:].replace('-', '/')} 모집 시작"
+    elif logic.status(it, today) == "year_round":
+        when = f"연중 사업(~{it['end'][:10].replace('-', '/')}) · 지금 신청받는지는 공고 확인"
     support = (it.get("support") or "").replace("○", "").strip().splitlines()
     head = f"**{it['org']} · {it['name']}**"
     if it.get("url"):
