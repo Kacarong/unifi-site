@@ -117,6 +117,40 @@ def test_matches() -> None:
     check("'특정학과' 는 판단할 수 없으니 보임", logic.matches(me, some_major), True)
 
 
+def test_regions() -> None:
+    print("지역 판정")
+    me = {"regions": "부산, 해운대구"}
+
+    def v(region, org="어느장학회", category="지역연고", profile=me):
+        it = item(org, region, "2026-10-01", "2026-11-30", category=category, region=region)
+        return logic.region_verdict(profile, it)
+
+    check("'○ 전국' 은 지역 무관", v("○ 전국"), "na")
+    check("기관명에 지명이 있어도 '○ 전국' 이면 지역 무관", v("○ 전국", org="부산은행장학재단"), "na")
+    check("'전국 대학생' 이라도 시가 적혀 있으면 그 시 장학금",
+          v("○ 군산시에 주민등록을 두고 있는 전국 대학생"), "no")
+    check("같은 시·도 다른 구는 뺌 (부산 수영구)", v("○ 부산 수영구 거주"), "no")
+    check("같은 구는 통과 (해운대구)", v("○ 해운대구에 1년 이상 거주"), "ok")
+    check("시·도까지만 정한 공고는 시·도로 통과 (부산 거주)", v("○ 부산 거주"), "ok")
+    check("구 이름만 있어도 어느 시인지 앎 (서대문구 → 서울)", v("○ 서대문구 거주", profile={"regions": "서울"}), "ok")
+    check("이름이 같은 구는 시·도까지 맞아야 (대구 동구 ≠ 부산 동구)",
+          v("○ 대구 동구에 주민등록", profile={"regions": "부산, 동구"}), "no")
+    check("공고에 구만 있으면 기관명의 시·도로 가림",
+          v("○ 동구 관내 거주", org="(재)대구동구교육재단", profile={"regions": "부산, 동구"}), "no")
+    check("'관내 거주' 는 기관명으로 판단", v("○ 관내 거주", org="경상북도 의성군청"), "no")
+    check("경기 광주시는 광주광역시가 아님", v("○ 경기도 광주시 거주", profile={"regions": "광주"}), "no")
+    check("광주광역시 사람에게 광주광역시 장학금", v("○ 광주광역시 남구 거주", profile={"regions": "광주, 남구"}), "ok")
+    check("강남구 안의 '남구' 를 따로 세지 않음", v("○ 서울 강남구 거주", profile={"regions": "부산, 남구"}), "no")
+
+    eup = item("금왕장학회", "읍", "2026-10-01", "2026-11-30", category="지역연고", region="○ 금왕읍에 1년 이상 거주")
+    check("읍·면 장학금은 판단 못 함", logic.region_verdict(me, eup), "unknown")
+    check("판단 못 한 것은 목록에는 보임", logic.matches(me, eup), True)
+    check("판단 못 한 것은 알림에서는 뺌", logic.matches(me, eup, strict=True), False)
+    check("읍 이름을 적으면 통과", logic.region_verdict({"regions": "금왕읍"}, eup), "ok")
+    check("시·군을 줄여 적은 공고도 내 시·군이면 통과",
+          v("○ 1년 이상 계속하여 횡성에 주소", org="횡성인재육성장학회", profile={"regions": "강원, 횡성군"}), "ok")
+
+
 def test_forecast() -> None:
     print("곧 열릴 장학금")
     last_year = item("재단A", "가을 장학", "2025-11-10", "2025-11-30")
@@ -218,6 +252,7 @@ def main() -> int:
     try:
         test_parse()
         test_matches()
+        test_regions()
         test_forecast()
         test_notifications()
     finally:

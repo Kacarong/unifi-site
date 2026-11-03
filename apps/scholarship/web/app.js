@@ -224,7 +224,8 @@ function card(it) {
   const badges = el('div', 'tags');
   badges.append(statusBadge(it));
   if (it.category && it.category !== '해당없음') badges.append(el('span', 'chip', it.category));
-  if (it.regional) badges.append(el('span', 'chip', '지역'));
+  if (it.region_check) badges.append(el('span', 'chip warn', '지역 확인 필요'));
+  else if (it.regional) badges.append(el('span', 'chip', '지역'));
   if (!it.mine) badges.append(el('span', 'chip dim', '조건 밖'));
   c.append(head, badges);
   if (it.support) c.append(el('p', 'support', it.support));

@@ -144,6 +144,7 @@ def _slim(it: dict[str, Any], today, stars: set[str], profile: dict[str, Any]) -
         starred=it["series"] in stars,
         mine=logic.matches(profile, it),
         regional=logic.is_regional(it),
+        region_check=logic.region_verdict(profile, it) == "unknown",
         support=" · ".join(support)[:140],
     )
     return out
