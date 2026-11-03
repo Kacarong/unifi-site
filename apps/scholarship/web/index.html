@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#070b16" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="apple-touch-icon" href="/icon-180.png" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <title>장학금 알리미 · unifi</title>
+    <link rel="stylesheet" href="/ui.css" />
+    <link rel="stylesheet" href="./style.css" />
+    <script src="/ui.js" defer></script>
+    <script src="./app.js" defer></script>
+    <noscript><style>.reveal { opacity: 1 !important; transform: none !important; }</style></noscript>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="back" href="/">← unifi</a>
+      <span class="spacer"></span>
+      <span class="tiny">장학금 알리미</span>
+    </header>
+
+    <div class="wrap stack">
+      <section class="hero reveal" style="view-transition-name: app-scholarship">
+        <h1>🎓 장학금 알리미</h1>
+        <p class="muted">
+          정부·지자체·재단 장학금을 내 조건으로 걸러 봅니다. ☆ 를 눌러 관심 표시하면
+          마감이 다가올 때, 그리고 다음 모집이 올라올 때 디스코드로 알려 드립니다.
+        </p>
+        <p id="status" class="tiny muted">불러오는 중…</p>
+      </section>
+
+      <details id="profileBox" class="panel reveal">
+        <summary><h2>내 조건</h2><span id="profileSummary" class="tiny muted"></span></summary>
+        <div class="field-grid form">
+          <label>사는 곳·학교 있는 곳
+            <input id="p_regions" type="text" placeholder="부산, 해운대구" autocomplete="off" />
+          </label>
+          <label>과정
+            <select id="p_level"><option value="">상관없음</option></select>
+          </label>
+          <label>학교 종류
+            <select id="p_school"><option value="">상관없음</option></select>
+          </label>
+          <label>계열
+            <select id="p_field"><option value="">상관없음</option></select>
+          </label>
+        </div>
+        <p class="tiny muted hint">
+          지역 장학금은 이 낱말이 기관명이나 거주 조건에 들어 있을 때만 보여 줍니다.
+          시·도와 시·군·구를 함께 적으면 잘 맞습니다(예: <b>서울, 서대문구</b>).
+          소득·성적 기준은 공고마다 적는 방식이 달라 거르지 않습니다. 원문에서 확인하세요.
+        </p>
+        <div class="btns"><button id="profileSave" class="btn primary">저장</button></div>
+      </details>
+
+      <section class="panel reveal">
+        <div class="tabs" role="tablist">
+          <button class="tab" data-view="open">신청 가능 <b></b></button>
+          <button class="tab" data-view="soon">곧 열림 <b></b></button>
+          <button class="tab" data-view="starred">관심 <b></b></button>
+          <button class="tab" data-view="all">전체 <b></b></button>
+        </div>
+        <div class="filters">
+          <input id="q" type="search" placeholder="검색: 기관, 장학금 이름, 지원 내용" autocomplete="off" />
+          <select id="category"><option value="">모든 유형</option></select>
+          <label class="check"><input id="mine" type="checkbox" checked /> 내 조건만</label>
+        </div>
+        <p id="viewHint" class="tiny muted"></p>
+        <div id="list" class="list"></div>
+        <button id="more" class="btn more" hidden>더 보기</button>
+      </section>
+
+      <details id="notifyBox" class="panel reveal">
+        <summary><h2>디스코드 알림</h2><span id="notifySummary" class="tiny muted"></span></summary>
+        <div class="field-grid form">
+          <label>웹훅 주소
+            <input id="s_webhook" type="url" placeholder="https://discord.com/api/webhooks/…" autocomplete="off" />
+          </label>
+          <label>멘션 (선택)
+            <input id="s_mention" type="text" placeholder="디스코드 사용자 ID 또는 @everyone" autocomplete="off" />
+          </label>
+          <label>마감 며칠 전에 알릴까요
+            <input id="s_days" type="text" inputmode="numeric" placeholder="7, 3, 1" autocomplete="off" />
+          </label>
+        </div>
+        <div class="checks">
+          <label class="check"><input id="s_new" type="checkbox" /> 내 조건에 맞는 새 장학금이 올라오면 알림</label>
+          <label class="check"><input id="s_starred" type="checkbox" /> 관심 장학금의 마감 임박·다음 모집 알림</label>
+        </div>
+        <p class="tiny muted hint">
+          웹훅은 디스코드 채널 설정 → 연동 → 웹후크 → 새 웹후크 → <b>웹후크 URL 복사</b>로 만듭니다.
+          알림은 밤 10시~아침 8시에는 보내지 않고 아침에 모아서 보냅니다.
+        </p>
+        <div class="btns">
+          <button id="notifySave" class="btn primary">저장</button>
+          <button id="notifyTest" class="btn">테스트 알림 보내기</button>
+        </div>
+        <p id="notifyMsg" class="tiny"></p>
+      </details>
+
+      <p class="tiny muted foot">
+        출처: <a id="sourceLink" href="https://www.data.go.kr/data/15028252/fileData.do" target="_blank" rel="noopener">공공데이터포털 · 한국장학재단 학자금지원정보(대학생)</a>.
+        한국장학재단이 한 달에 한 번 모아 올리는 자료라 막 올라온 공고는 늦게 들어올 수 있고,
+        대학 자체 장학금은 대부분 빠져 있습니다. 신청 전에 꼭 기관 공고 원문을 확인하세요.
+        <button id="syncBtn" class="linkish">지금 원본 다시 받기</button>
+      </p>
+    </div>
+  </body>
+</html>

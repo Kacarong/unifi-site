@@ -1,0 +1,138 @@
+/* 장학금 알리미 — 앱 전용 스타일. 토큰·패널·버튼·입력은 /ui.css 가 준다. */
+
+.wrap {
+  --accent: #22c55e;
+  --accent-2: #3b82f6;
+}
+
+.spacer { flex: 1; }
+
+.hero { padding: 22px 2px 6px; }
+.hero p { margin-top: 8px; font-size: 13.5px; }
+.hero #status { font-size: 12px; }
+
+/* 접는 패널 */
+details.panel > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+details.panel > summary::-webkit-details-marker { display: none; }
+details.panel > summary h2 { margin: 0; }
+details.panel > summary::after { content: '펼치기 ▾'; margin-left: auto; font-size: 12px; color: var(--dim); }
+details.panel[open] > summary::after { content: '접기 ▴'; }
+details.panel[open] > summary { margin-bottom: 14px; }
+
+.hint { margin: 12px 0 0; line-height: 1.7; }
+.btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.checks { display: grid; gap: 8px; margin-top: 14px; }
+label.check { font-size: 13.5px; }
+
+/* 탭 */
+.tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: -2px -2px 12px;
+  padding: 2px;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  flex: none;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--sub);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.tab b { font-weight: 700; margin-left: 2px; color: var(--text); }
+.tab.active {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+}
+@media (max-width: 560px) {
+  .filters { grid-template-columns: 1fr auto; }
+  .filters #q { grid-column: 1 / -1; }
+}
+#viewHint { margin: 10px 0 12px; line-height: 1.6; }
+
+/* 목록 */
+.list { display: flex; flex-direction: column; gap: 8px; }
+.item {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: rgba(255, 255, 255, 0.025);
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: border-color var(--fast, 0.15s);
+}
+.item.skeleton { height: 86px; cursor: default; }
+.item:active, .item.expanded { border-color: var(--line-strong); }
+.item .head { display: flex; gap: 10px; align-items: flex-start; }
+.item .title { flex: 1; display: grid; gap: 2px; min-width: 0; }
+.item .org { font-size: 12px; color: var(--dim); }
+.item strong { font-size: 15px; line-height: 1.4; word-break: keep-all; overflow-wrap: anywhere; }
+.item .support { margin: 8px 0 0; font-size: 13px; color: var(--sub); line-height: 1.55; }
+
+.tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.badge.ok { color: var(--ok); border-color: rgba(79, 211, 157, 0.38); }
+.badge.hot { color: var(--err); border-color: rgba(255, 107, 127, 0.45); }
+.badge.warn { color: var(--warn); border-color: rgba(245, 185, 92, 0.38); }
+.badge.off { color: var(--dim); }
+.chip.dim { color: var(--dim); border-style: dashed; }
+
+.star {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  margin: -6px -6px 0 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--dim);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+.star.on { color: #f5b95c; }
+.star:active { transform: scale(0.88); }
+
+/* 펼친 내용 */
+.detail { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); cursor: auto; font-size: 13.5px; }
+.detail .sec { margin-top: 12px; }
+.detail h3 { font-size: 12px; font-weight: 650; color: var(--dim); margin: 0 0 4px; }
+.detail p { margin: 0; white-space: pre-line; line-height: 1.65; color: var(--sub); overflow-wrap: anywhere; }
+.detail .btn { margin-top: 14px; }
+
+.more { width: 100%; margin-top: 12px; }
+.empty { padding: 18px 4px; text-align: center; font-size: 13.5px; line-height: 1.7; }
+
+.foot { line-height: 1.7; padding: 0 4px 24px; }
+.foot a { color: var(--sub); }
+.linkish {
+  border: 0;
+  background: none;
+  padding: 0;
+  margin-left: 4px;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.more[hidden] { display: none; }
