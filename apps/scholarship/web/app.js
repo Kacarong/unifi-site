@@ -140,8 +140,15 @@ function starButton(it) {
     b.disabled = true;
     try {
       await api(`/stars/${it.series}`, json('PUT', { on }));
-      b.classList.toggle('on', on);
-      b.textContent = on ? '★' : '☆';
+      // 관심은 장학금(series) 단위라 화면에 같은 장학금의 다른 회차가 있으면 같이 바꾼다
+      for (const c of document.querySelectorAll(`.item[data-series="${CSS.escape(it.series)}"]`)) {
+        c.classList.toggle('starred', on);
+        const s = c.querySelector('.star');
+        s.classList.toggle('on', on);
+        s.textContent = on ? '★' : '☆';
+        s.title = on ? '관심 해제' : '관심 표시 — 마감 임박·다음 모집을 알려 드립니다';
+        s.setAttribute('aria-label', s.title);
+      }
       loadCounts();
     } catch (e) {
       alert(e.message);
@@ -241,7 +248,8 @@ async function toggleDetail(card, it) {
 }
 
 function card(it) {
-  const c = el('article', 'item');
+  const c = el('article', `item${it.starred ? ' starred' : ''}`);
+  c.dataset.series = it.series;
   const head = el('div', 'head');
   const title = el('div', 'title');
   title.append(el('span', 'org', it.org), el('strong', null, it.notice_title || it.name));

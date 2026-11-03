@@ -84,6 +84,12 @@ label.check { font-size: 13.5px; }
 }
 .item.skeleton { height: 86px; cursor: default; }
 .item:active, .item.expanded { border-color: var(--line-strong); }
+/* 관심(★) 표시한 장학금은 별과 같은 따뜻한 색으로 살짝 */
+.item.starred {
+  border-color: rgba(245, 185, 92, 0.32);
+  background: rgba(245, 185, 92, 0.06);
+}
+.item.starred:active, .item.starred.expanded { border-color: rgba(245, 185, 92, 0.5); }
 .item .head { display: flex; gap: 10px; align-items: flex-start; }
 .item .title { flex: 1; display: grid; gap: 2px; min-width: 0; }
 .item .org { font-size: 12px; color: var(--dim); }
