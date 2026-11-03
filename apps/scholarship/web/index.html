@@ -115,8 +115,11 @@
       <details id="notifyBox" class="panel reveal">
         <summary><h2>디스코드 알림</h2><span id="notifySummary" class="tiny muted"></span></summary>
         <div class="field-grid form">
-          <label>웹훅 주소
-            <input id="s_webhook" type="url" placeholder="https://discord.com/api/webhooks/…" autocomplete="off" />
+          <label>봇 토큰
+            <input id="s_token" type="password" placeholder="개발자 포털 → Bot → Reset Token" autocomplete="off" />
+          </label>
+          <label>채널 ID
+            <input id="s_channel" type="text" inputmode="numeric" placeholder="알림을 올릴 채널의 ID (숫자)" autocomplete="off" />
           </label>
           <label>멘션 (선택)
             <input id="s_mention" type="text" placeholder="디스코드 사용자 ID 또는 @everyone" autocomplete="off" />
@@ -130,7 +133,9 @@
           <label class="check"><input id="s_starred" type="checkbox" /> 관심 장학금의 마감 임박·다음 모집 알림</label>
         </div>
         <p class="tiny muted hint">
-          웹훅은 디스코드 채널 설정 → 연동 → 웹후크 → 새 웹후크 → <b>웹후크 URL 복사</b>로 만듭니다.
+          봇 토큰은 디스코드 개발자 포털 → 내 앱 → Bot → <b>Reset Token</b>으로 받습니다. 봇을 서버에 초대하고
+          그 채널에 <b>채널 보기·메시지 보내기·링크 첨부</b> 권한을 주세요.
+          채널 ID는 디스코드 설정 → 고급 → 개발자 모드를 켠 뒤 채널을 우클릭 → <b>채널 ID 복사</b>로 얻습니다.
           알림은 밤 10시~아침 8시에는 보내지 않고 아침에 모아서 보냅니다.
         </p>
         <div class="btns">

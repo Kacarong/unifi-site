@@ -7,9 +7,10 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 import hashlib
+import re
 
 from . import boards, logic, source, store
-from .worker import build_message, now_kst, post_discord, sync, sync_extra, worker
+from .worker import build_message, discord_target, now_kst, post_discord, sync, sync_extra, worker
 
 router = APIRouter()
 
@@ -26,7 +27,8 @@ class ProfilePatch(BaseModel):
 
 
 class SettingsPatch(BaseModel):
-    discord_webhook_url: Optional[str] = None
+    discord_bot_token: Optional[str] = None
+    discord_channel_id: Optional[str] = None
     discord_mention: Optional[str] = None
     notify_new: Optional[bool] = None
     notify_starred: Optional[bool] = None
@@ -65,7 +67,7 @@ def status() -> dict[str, Any]:
         "last_error": state["last_error"],
         "notify_error": state.get("notify_error", ""),
         "worker_running": worker.running,
-        "notify_ready": bool(state["settings"].get("discord_webhook_url")),
+        "notify_ready": discord_target(state["settings"]) is not None,
         "stars": len(state["stars"]),
     }
 
@@ -106,9 +108,9 @@ def patch_profile(body: ProfilePatch) -> dict[str, Any]:
 
 def _public_settings() -> dict[str, Any]:
     settings = store.snapshot()["settings"]
-    url = settings.pop("discord_webhook_url", "")
-    # 웹훅 주소는 그 자체가 비밀번호라 화면에 다시 내보내지 않는다.
-    settings["discord_webhook_set"] = bool(url)
+    token = settings.pop("discord_bot_token", "")
+    # 봇 토큰은 그 자체가 비밀번호라 화면에 다시 내보내지 않는다.
+    settings["discord_bot_token_set"] = bool(token)
     return settings
 
 
@@ -120,9 +122,19 @@ def get_settings() -> dict[str, Any]:
 @router.patch("/settings")
 def patch_settings(body: SettingsPatch, request: Request) -> dict[str, Any]:
     patch = {k: v for k, v in body.model_dump().items() if v is not None}
-    url = (patch.get("discord_webhook_url") or "").strip()
-    if url and not url.startswith(("https://discord.com/api/webhooks/", "https://discordapp.com/api/webhooks/")):
-        raise HTTPException(400, "디스코드 웹훅 주소가 아닙니다 (https://discord.com/api/webhooks/… 형태)")
+    if "discord_bot_token" in patch:
+        token = patch["discord_bot_token"].strip()
+        if token.lower().startswith("bot "):
+            token = token[4:].strip()
+        # 봇 토큰은 점으로 나뉜 세 덩어리다(앞은 봇 ID). 웹훅 주소나 클라이언트 시크릿을 잘못 넣는 일을 막는다.
+        if token and not re.fullmatch(r"[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{20,}", token):
+            raise HTTPException(400, "디스코드 봇 토큰이 아닙니다. 개발자 포털 → Bot → Reset Token 으로 받은 값을 넣어 주세요")
+        patch["discord_bot_token"] = token
+    if "discord_channel_id" in patch:
+        channel = patch["discord_channel_id"].strip()
+        if channel and not re.fullmatch(r"\d{17,20}", channel):
+            raise HTTPException(400, "채널 ID는 17~20자리 숫자입니다 (채널 우클릭 → 채널 ID 복사)")
+        patch["discord_channel_id"] = channel
     if "reminder_days" in patch:
         patch["reminder_days"] = sorted({d for d in patch["reminder_days"] if 0 <= d <= 60}, reverse=True)
     store.update_settings(patch)
@@ -134,16 +146,16 @@ def patch_settings(body: SettingsPatch, request: Request) -> dict[str, Any]:
 @router.post("/settings/test")
 def test_notify() -> dict[str, bool]:
     state = store.snapshot()
-    url = state["settings"].get("discord_webhook_url") or ""
-    if not url:
-        raise HTTPException(400, "디스코드 웹훅 주소를 먼저 저장해 주세요")
+    target = discord_target(state["settings"])
+    if not target:
+        raise HTTPException(400, "디스코드 봇 토큰과 채널 ID를 먼저 저장해 주세요")
     today = now_kst().date()
     sample = [it for it in store.items() if logic.status(it, today) == "open"][:1]
     note = {"kind": "new", "items": sample, "keys": []}
     payload = build_message(note, state["settings"], state.get("site_url", ""), today)
     payload["embeds"][0]["title"] = "🔔 장학금 알리미 연결 확인 (테스트)"
     try:
-        post_discord(url, payload)
+        post_discord(target, payload)
     except RuntimeError as exc:
         raise HTTPException(502, str(exc)) from exc
     return {"ok": True}

@@ -266,7 +266,7 @@ def test_notifications() -> None:
     print("알림")
     old = item("전국재단", "있던 것", "2026-10-01", "2026-11-30")
     reset_store([old])
-    store.update_settings({"discord_webhook_url": "https://discord.com/api/webhooks/1/x"})
+    store.update_settings({"discord_bot_token": "MTIz.abc.def", "discord_channel_id": "123456789012345678"})
     sent: list[dict] = []
 
     def fake_send(url, payload):
@@ -321,15 +321,95 @@ def test_notifications() -> None:
     check("다음 확인 때 다시 보냄", worker.check(at(dt.date(2026, 11, 22), 11), send=fake_send), ["new"])
     check("성공하면 실패 표시를 지움", store.snapshot()["notify_error"], "")
 
-    # 웹훅이 없을 때 쌓인 것은 나중에 웹훅을 넣어도 쏟아지지 않는다
-    store.update_settings({"discord_webhook_url": ""})
-    quiet_one = item("전국재단6", "웹훅 없을 때", "2026-11-22", "2026-12-20")
+    # 봇이 없을 때 쌓인 것은 나중에 봇 토큰을 넣어도 쏟아지지 않는다
+    store.update_settings({"discord_bot_token": ""})
+    quiet_one = item("전국재단6", "봇 없을 때", "2026-11-22", "2026-12-20")
     store.replace_items([old, fresh, next_round, late, retry, quiet_one])
     before = len(sent)
     worker.check(at(dt.date(2026, 11, 22), 12), send=fake_send)
-    store.update_settings({"discord_webhook_url": "https://discord.com/api/webhooks/1/x"})
-    check("웹훅을 나중에 넣어도 밀린 알림이 안 쏟아짐",
+    store.update_settings({"discord_bot_token": "MTIz.abc.def", "discord_channel_id": "123456789012345678"})
+    check("봇 토큰을 나중에 넣어도 밀린 알림이 안 쏟아짐",
           (worker.check(at(dt.date(2026, 11, 22), 13), send=fake_send), len(sent) - before), ([], 0))
+
+
+def test_discord_bot() -> None:
+    print("디스코드 봇")
+    import io
+    import json
+    import urllib.error
+    from unittest import mock
+
+    from fastapi import HTTPException
+
+    from apps.scholarship import api
+
+    reset_store([])
+    check("토큰·채널 둘 다 없으면 보낼 곳 없음", worker.discord_target(store.snapshot()["settings"]), None)
+    store.update_settings({"discord_bot_token": "a.b.c"})
+    check("채널 ID 가 없으면 보낼 곳 없음", worker.discord_target(store.snapshot()["settings"]), None)
+
+    seen = {}
+
+    class Resp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def fake_open(req, timeout):
+        seen.update(url=req.full_url, auth=req.get_header("Authorization"),
+                    ua=req.get_header("User-agent"), body=json.loads(req.data))
+        return Resp()
+
+    with mock.patch("urllib.request.urlopen", fake_open):
+        worker.post_discord(("TOKEN", "123456789012345678"), {"content": "hi"})
+    check("채널 메시지 API 로 보냄", seen["url"], "https://discord.com/api/v10/channels/123456789012345678/messages")
+    check("Bot 토큰 인증", seen["auth"], "Bot TOKEN")
+    check("DiscordBot User-Agent", seen["ua"].startswith("DiscordBot ("), True)
+    check("본문 그대로", seen["body"], {"content": "hi"})
+
+    def refuse(code):
+        def _open(req, timeout):
+            raise urllib.error.HTTPError(req.full_url, code, "x", {}, io.BytesIO(b'{"message": "Missing Access"}'))
+        return _open
+
+    for code, word in ((401, "토큰"), (403, "권한"), (404, "채널 ID")):
+        with mock.patch("urllib.request.urlopen", refuse(code)):
+            try:
+                worker.post_discord(("T", "1"), {})
+                msg = ""
+            except RuntimeError as exc:
+                msg = str(exc)
+        check(f"HTTP {code} 은 원인을 알려 줌", (f"HTTP {code}" in msg, word in msg, "Missing Access" in msg), (True, True, True))
+
+    class Req:
+        base_url = "https://unifi.example/"
+
+    def patch(**kw):
+        try:
+            return api.patch_settings(api.SettingsPatch(**kw), Req())
+        except HTTPException as exc:
+            return exc.status_code
+
+    good = ".".join(["x" * 24, "y" * 6, "z" * 30])  # 형식만 맞춘 가짜 토큰
+    check("웹훅 주소는 토큰으로 안 받음", patch(discord_bot_token="https://discord.com/api/webhooks/1/x"), 400)
+    check("숫자 아닌 채널 ID 거절", patch(discord_channel_id="#장학금"), 400)
+    out = patch(discord_bot_token="Bot " + good, discord_channel_id=" 123456789012345678 ")
+    check("토큰은 화면에 안 내보냄", ("discord_bot_token" in out, out["discord_bot_token_set"]), (False, True))
+    check("앞의 'Bot ' 은 떼고 저장", store.snapshot()["settings"]["discord_bot_token"], good)
+    check("채널 ID 공백 정리", out["discord_channel_id"], "123456789012345678")
+    check("알림 준비됨", api.status()["notify_ready"], True)
+
+    # 예전 웹훅 설정이 남아 있던 state.json 을 읽어도 그 값은 버린다
+    with open(store.STATE_PATH, encoding="utf-8") as fh:
+        raw = json.load(fh)
+    raw["settings"]["discord_webhook_url"] = "https://discord.com/api/webhooks/1/x"
+    with open(store.STATE_PATH, "w", encoding="utf-8") as fh:
+        json.dump(raw, fh)
+    store._state = None
+    check("예전 웹훅 설정은 버림", "discord_webhook_url" in store.snapshot()["settings"], False)
+    check("봇 설정은 그대로", worker.discord_target(store.snapshot()["settings"]), (good, "123456789012345678"))
 
 
 def main() -> int:
@@ -341,6 +421,7 @@ def main() -> int:
         test_year_round()
         test_forecast()
         test_notifications()
+        test_discord_bot()
     finally:
         shutil.rmtree(_TMP, ignore_errors=True)
     if FAILURES:

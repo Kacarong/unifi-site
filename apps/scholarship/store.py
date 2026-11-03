@@ -33,7 +33,8 @@ DEFAULT_PROFILE: dict[str, Any] = {
 }
 
 DEFAULT_SETTINGS: dict[str, Any] = {
-    "discord_webhook_url": "",
+    "discord_bot_token": "",    # 봇 토큰 — 화면에 다시 내보내지 않는다
+    "discord_channel_id": "",   # 알림을 올릴 채널 ID
     "discord_mention": "",
     "notify_new": True,         # 내 조건에 맞는 새 장학금이 올라오면
     "notify_starred": True,     # 관심 장학금의 새 회차·마감 임박
@@ -87,7 +88,9 @@ def _load() -> dict[str, Any]:
                 loaded = json.load(fh)
             state.update(loaded)
             state["profile"] = {**DEFAULT_PROFILE, **loaded.get("profile", {})}
-            state["settings"] = {**DEFAULT_SETTINGS, **loaded.get("settings", {})}
+            # 예전 웹훅 주소처럼 이제 안 쓰는 설정은 버린다
+            old = loaded.get("settings", {})
+            state["settings"] = {**DEFAULT_SETTINGS, **{k: v for k, v in old.items() if k in DEFAULT_SETTINGS}}
         except (OSError, ValueError):
             pass
         _state = state

@@ -123,18 +123,49 @@ def _mention(m: str) -> str:
     return m
 
 
-def post_discord(url: str, payload: dict[str, Any]) -> None:
+DISCORD_API = "https://discord.com/api/v10"
+
+
+def discord_target(settings: dict[str, Any]) -> tuple[str, str] | None:
+    """(봇 토큰, 채널 ID). 둘 중 하나라도 없으면 알림을 보낼 곳이 없다."""
+    token = (settings.get("discord_bot_token") or "").strip()
+    channel = (settings.get("discord_channel_id") or "").strip()
+    return (token, channel) if token and channel else None
+
+
+def _discord_reason(exc: urllib.error.HTTPError) -> str:
+    try:
+        detail = json.loads(exc.read().decode("utf-8", "replace")).get("message", "")
+    except Exception:  # noqa: BLE001
+        detail = ""
+    hint = {
+        401: "봇 토큰이 틀렸거나 재발급돼 무효가 됐습니다. 개발자 포털에서 토큰을 다시 복사해 주세요",
+        403: "봇이 그 채널에 글을 쓸 권한이 없습니다. 봇을 서버에 초대하고 채널 보기·메시지 보내기·링크 첨부 권한을 주세요",
+        404: "채널을 찾지 못했습니다. 채널 ID가 맞는지, 봇이 그 서버에 들어가 있는지 확인해 주세요",
+    }.get(exc.code, "")
+    head = f"디스코드가 거절했습니다 (HTTP {exc.code}{', ' + detail if detail else ''})"
+    return f"{head}. {hint}" if hint else head
+
+
+def post_discord(target: tuple[str, str], payload: dict[str, Any]) -> None:
+    """봇 토큰으로 채널에 메시지를 올린다."""
+    token, channel = target
     req = urllib.request.Request(
-        url,
+        f"{DISCORD_API}/channels/{channel}/messages",
         data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json", "User-Agent": "unifi-scholarship/1.0"},
+        headers={
+            "Authorization": f"Bot {token}",
+            "Content-Type": "application/json",
+            # 디스코드는 봇 요청에 이 형식의 User-Agent 를 요구한다
+            "User-Agent": "DiscordBot (https://unifi.kacarong.kr, 1.0)",
+        },
         method="POST",
     )
     try:
         with urllib.request.urlopen(req, timeout=15):
             pass
     except urllib.error.HTTPError as exc:
-        raise RuntimeError(f"디스코드가 거절했습니다 (HTTP {exc.code}). 웹훅 주소를 확인해 주세요") from exc
+        raise RuntimeError(_discord_reason(exc)) from exc
     except Exception as exc:  # noqa: BLE001
         raise RuntimeError(f"디스코드에 보내지 못했습니다: {exc}") from exc
 
@@ -212,7 +243,7 @@ def check(now: dt.datetime | None = None, send=post_discord) -> list[str]:
         return []
 
     settings = state["settings"]
-    url = (settings.get("discord_webhook_url") or "").strip()
+    target = discord_target(settings)
     notes = logic.plan_notifications(
         items,
         profile=state["profile"],
@@ -224,14 +255,14 @@ def check(now: dt.datetime | None = None, send=post_discord) -> list[str]:
     )
     done: list[str] = []
     for note in notes:
-        if url:
+        if target:
             try:
-                send(url, build_message(note, settings, state.get("site_url", ""), today))
+                send(target, build_message(note, settings, state.get("site_url", ""), today))
             except RuntimeError as exc:
                 store.update({"notify_error": str(exc)})
                 log.warning("%s", exc)
                 break  # 다음 시간에 다시 — 보낸 표시를 안 했으니 놓치지 않는다
-        # 웹훅이 없어도 표시는 한다. 나중에 웹훅을 넣는 순간 밀린 알림이 쏟아지면 안 된다.
+        # 봇이 없어도 표시는 한다. 나중에 봇을 넣는 순간 밀린 알림이 쏟아지면 안 된다.
         store.mark_sent(note["keys"])
         done.append(note["kind"])
     else:

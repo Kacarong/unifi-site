@@ -326,16 +326,17 @@ const reload = () => load(false);
 
 // ---------------- 알림 설정 ----------------
 function notifySummary(s) {
-  if (!s.discord_webhook_set) return '꺼짐 — 웹훅을 넣으면 켜집니다';
+  if (!s.discord_bot_token_set || !s.discord_channel_id) return '꺼짐 — 봇 토큰과 채널 ID를 넣으면 켜집니다';
   return `켜짐 · 마감 ${(s.reminder_days || []).map((d) => `D-${d}`).join('/') || '알림 없음'}`;
 }
 
 async function loadSettings() {
   const s = await api('/settings');
-  $('s_webhook').value = '';
-  $('s_webhook').placeholder = s.discord_webhook_set
-    ? '저장돼 있음 — 바꿀 때만 새 주소를 넣으세요'
-    : 'https://discord.com/api/webhooks/…';
+  $('s_token').value = '';
+  $('s_token').placeholder = s.discord_bot_token_set
+    ? '저장돼 있음 — 바꿀 때만 새 토큰을 넣으세요'
+    : '개발자 포털 → Bot → Reset Token';
+  $('s_channel').value = s.discord_channel_id || '';
   $('s_mention').value = s.discord_mention || '';
   $('s_days').value = (s.reminder_days || []).join(', ');
   $('s_new').checked = !!s.notify_new;
@@ -345,13 +346,14 @@ async function loadSettings() {
 
 async function saveSettings() {
   const body = {
+    discord_channel_id: $('s_channel').value.trim(),
     discord_mention: $('s_mention').value.trim(),
     notify_new: $('s_new').checked,
     notify_starred: $('s_starred').checked,
     reminder_days: $('s_days').value.split(/[^0-9]+/).filter(Boolean).map(Number),
   };
-  const hook = $('s_webhook').value.trim();
-  if (hook) body.discord_webhook_url = hook;
+  const token = $('s_token').value.trim();
+  if (token) body.discord_bot_token = token;
   try {
     await api('/settings', json('PATCH', body));
     await loadSettings();
