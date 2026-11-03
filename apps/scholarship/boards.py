@@ -211,15 +211,18 @@ def attachments(page: str, base_url: str) -> list[tuple[str, str]]:
     return out
 
 
+_AMOUNT = re.compile(r"\d[\d,]*\s*만\s*원|생활비|생활\s*지원|학업\s*장려|등록금")
+
+
 def _excerpt(text: str) -> str:
-    """지원 내용으로 보일 줄 몇 개 — 목록의 '지원 용도' 판정에 쓴다."""
+    """지원 내용으로 보일 줄 몇 개 — 목록 요약과 '지원 용도'(생활비·등록금) 판정에 쓴다.
+    금액이나 용도 낱말이 든 짧은 줄만 고른다(재단 소개 문단은 빼려고)."""
     lines = []
     for ln in text.splitlines():
-        ln = ln.strip()
-        if 4 <= len(ln) <= 160 and re.search(r"(만\s*원|지원금|장학금|생활비|등록금|학업장려|생활지원)", ln):
-            if re.search(r"(지급|지원|금액|혜택|내용|만\s*원)", ln):
-                lines.append("○ " + ln)
-        if len(lines) >= 4:
+        ln = re.sub(r"\s+", " ", ln).strip()
+        if 4 <= len(ln) <= 90 and _AMOUNT.search(ln) and not re.search(r"중지|환수|제외|불가", ln):
+            lines.append("○ " + ln)
+        if len(lines) >= 3:
             break
     return "\n".join(lines)
 
