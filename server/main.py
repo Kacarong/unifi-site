@@ -194,7 +194,7 @@ async def _desktop_only_gate(request: Request, call_next):
     if path.startswith("/apps/") and is_mobile(request):
         app_id = path.split("/")[2] if len(path.split("/")) > 2 else ""
         spec = next((s for s in APPS if s.id == app_id), None)
-        if spec and spec.desktop_only:
+        if spec and spec.enabled and spec.desktop_only:
             return HTMLResponse(
                 DESKTOP_ONLY_PAGE.format(
                     name=spec.name,
@@ -219,7 +219,7 @@ def list_apps(request: Request) -> JSONResponse:
     out = []
     for spec in APPS:
         item = spec.to_json()
-        if mobile and spec.desktop_only:
+        if mobile and spec.enabled and spec.desktop_only:
             # 휴대폰에서는 눌러도 못 쓰는 앱이니 처음부터 그렇게 보여 준다
             item["status"] = "desktop_only"
             item["url"] = None

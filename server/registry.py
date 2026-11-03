@@ -105,7 +105,7 @@ class AppSpec:
             "status": self.status,
             "error": self.error,
             "notes": self.notes,
-            "url": f"/apps/{self.id}/" if self.has_frontend or (self.mount and not self.error) else None,
+            "url": f"/apps/{self.id}/" if self.enabled and (self.has_frontend or (self.mount and not self.error)) else None,
             "api": f"/api/{self.id}" if self.router_factory else None,
         }
 

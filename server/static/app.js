@@ -2,7 +2,7 @@ const STATUS_LABEL = {
   ready: '사용 가능',
   needs_build: '빌드 필요',
   error: '오류',
-  disabled: '꺼짐',
+  disabled: '사용 불가',
   desktop_only: 'PC 전용',
 };
 
@@ -11,13 +11,14 @@ const WHY_BY_STATUS = {
   desktop_only: '🔒 휴대폰에서는 쓸 수 없습니다. PC에서 열어 주세요.',
   needs_build: '⚙️ 프론트엔드 빌드가 필요합니다.',
   error: '⚠️ 앱을 불러오지 못했습니다.',
-  disabled: '⏸️ 꺼져 있는 앱입니다.',
+  disabled: '⏸️ 지금은 사용할 수 없는 앱입니다.',
 };
 
 const NOTE_BY_STATUS = {
   needs_build: '프론트엔드가 아직 빌드되지 않았습니다. `python scripts/build.py <id>` 를 실행하세요.',
   error: '앱 로드 중 오류가 났습니다. 서버 로그를 확인하세요.',
   desktop_only: '이 앱은 PC에서만 쓸 수 있습니다. 로컬 PC 프로그램이 함께 있어야 동작합니다.',
+  disabled: '지금은 사용할 수 없도록 꺼 둔 앱입니다.',
 };
 
 function el(tag, cls, text) {
@@ -83,7 +84,8 @@ function card(app) {
     inner.append(tags);
   }
 
-  const note = app.notes || NOTE_BY_STATUS[app.status];
+  // 꺼 둔 앱에 사용 안내(notes)가 뜨면 쓸 수 있는 것처럼 보이므로 상태 안내를 앞세운다
+  const note = app.status === 'disabled' ? NOTE_BY_STATUS.disabled : (app.notes || NOTE_BY_STATUS[app.status]);
   if (note) inner.append(el('div', 'note', note));
 
   wrap.append(inner);

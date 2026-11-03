@@ -22,7 +22,14 @@ os.environ["UNIFI_PASSWORD"] = "test-secret-pw"
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from server.main import app  # noqa: E402
+# cgvmacro 는 실제 설정에서 사용 불가(enabled=False)지만, 이 테스트는 PC 전용·
+# 에이전트 경로 게이트를 고정하려고 그 앱을 쓴다. 서버가 앱을 붙이기 전에 켠다.
+from apps.cgvmacro.app import SPEC as CGV_SPEC  # noqa: E402
+
+CGV_REAL_ENABLED = CGV_SPEC.enabled
+CGV_SPEC.enabled = True
+
+from server.main import APPS, app  # noqa: E402
 
 FAILURES: list[str] = []
 
@@ -121,6 +128,18 @@ def run() -> None:
     # PC 전용이 아닌 앱은 휴대폰에서도 그대로
     apps = client.get("/api/_apps", headers=PHONE).json()
     check("다른 앱은 영향 없음", next(a for a in apps if a["id"] == "geoglobe")["status"], "ready")
+
+    print("4-3) 꺼 둔 앱은 '사용 불가'로만 보인다")
+    check("cgvmacro 실제 설정은 사용 불가", CGV_REAL_ENABLED, False)
+    spec = next(s for s in APPS if s.id == "cgvmacro")
+    spec.enabled = False
+    try:
+        # 휴대폰에서도 'PC 전용'이 아니라 '사용 불가'로 보여야 한다
+        check("휴대폰에서도 사용 불가 표시", cgv(PHONE)["status"], "disabled")
+        check("PC 에서도 사용 불가 표시", cgv(PC)["status"], "disabled")
+        check("열 주소 없음", cgv(PC)["url"], None)
+    finally:
+        spec.enabled = True
 
     print("5) 쿠키 위조는 통하지 않는다")
     forged = TestClient(app, cookies={"unifi_auth": "99999999999.deadbeef"})
