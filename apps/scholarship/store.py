@@ -1,6 +1,8 @@
 """장학금 알리미의 저장소.
 
 - `items.json`  최근에 받은 장학금 목록 (원본 CSV 를 정리한 것)
+- `extras.json` CSV 에 아직 없는 장학금 — 한국장학재단 실시간 포털·공고 게시판에서 모은 것
+- `kosaf_cache.json` 포털 상세를 이미 받아 둔 것 (갱신마다 다시 받지 않게)
 - `state.json`  내 조건, 관심 표시, 알림 설정, 이미 보낸 알림, 동기화 기록
 
 개인용 규모라 파일 두 개면 충분하다. 목록은 크고(약 4MB) 자주 안 바뀌고,
@@ -17,6 +19,8 @@ from server.paths import data_dir
 
 DIR = data_dir("scholarship")
 ITEMS_PATH = os.path.join(DIR, "items.json")
+EXTRAS_PATH = os.path.join(DIR, "extras.json")
+KOSAF_CACHE_PATH = os.path.join(DIR, "kosaf_cache.json")
 STATE_PATH = os.path.join(DIR, "state.json")
 
 DEFAULT_PROFILE: dict[str, Any] = {
@@ -40,7 +44,9 @@ MAX_SENT = 2000
 
 _lock = threading.RLock()
 _state: dict[str, Any] | None = None
-_items: list[dict[str, Any]] | None = None
+_items: list[dict[str, Any]] | None = None   # CSV + extras 를 합친 것
+_base: list[dict[str, Any]] | None = None    # CSV
+_extras: list[dict[str, Any]] | None = None
 
 
 def _blank() -> dict[str, Any]:
@@ -53,6 +59,8 @@ def _blank() -> dict[str, Any]:
         "sent": [],         # 이미 보낸 알림 키
         "meta": {},         # 공공데이터포털 파일 번호·수정일
         "last_sync_at": 0.0,
+        "last_extra_at": 0.0,  # 포털·게시판 확인
+        "extra_error": "",
         "last_check_at": 0.0,
         "last_error": "",    # 원본 갱신 실패
         "notify_error": "",  # 디스코드 전송 실패
@@ -99,23 +107,66 @@ def update(patch: dict[str, Any]) -> None:
 
 
 # ---------------- 목록 ----------------
+def _read_list(path: str) -> list[dict[str, Any]]:
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+        return data if isinstance(data, list) else []
+    except (OSError, ValueError):
+        return []
+
+
+def _merged() -> list[dict[str, Any]]:
+    global _items, _base, _extras
+    if _base is None:
+        _base = _read_list(ITEMS_PATH)
+    if _extras is None:
+        _extras = _read_list(EXTRAS_PATH)
+    if _items is None:
+        from .logic import merge
+
+        _items = merge(_base, _extras)
+    return _items
+
+
 def items() -> list[dict[str, Any]]:
-    global _items
     with _lock:
-        if _items is None:
-            try:
-                with open(ITEMS_PATH, encoding="utf-8") as fh:
-                    _items = json.load(fh)
-            except (OSError, ValueError):
-                _items = []
-        return _items
+        return _merged()
+
+
+def base_items() -> list[dict[str, Any]]:
+    """CSV 에서 온 것만 — 포털에서 무엇이 새것인지 가릴 때 쓴다."""
+    with _lock:
+        _merged()
+        return _base or []
 
 
 def replace_items(new_items: list[dict[str, Any]]) -> None:
-    global _items
+    global _items, _base
     with _lock:
         _write(ITEMS_PATH, new_items)
-        _items = new_items
+        _base, _items = new_items, None
+
+
+def replace_extras(new_extras: list[dict[str, Any]]) -> None:
+    global _items, _extras
+    with _lock:
+        _write(EXTRAS_PATH, new_extras)
+        _extras, _items = new_extras, None
+
+
+def kosaf_cache() -> dict[str, Any]:
+    try:
+        with open(KOSAF_CACHE_PATH, encoding="utf-8") as fh:
+            data = json.load(fh)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_kosaf_cache(cache: dict[str, Any]) -> None:
+    with _lock:
+        _write(KOSAF_CACHE_PATH, cache)
 
 
 # ---------------- 내 조건 / 설정 ----------------

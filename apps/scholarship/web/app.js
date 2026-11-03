@@ -51,7 +51,9 @@ async function loadStatus() {
     let text = s.count
       ? `${basis} · 장학금 ${s.count.toLocaleString()}건 · 지금 신청 가능 ${s.open}건 · 마지막 확인 ${fmtTs(s.last_sync_at)}`
       : '아직 원본을 받지 못했습니다. 잠시 뒤 새로고침하거나 아래 "지금 원본 다시 받기"를 눌러 주세요.';
+    if (s.extra_count) text += ` · 포털·공고 게시판에서 더 찾은 것 ${s.extra_count}건 (${fmtTs(s.last_extra_at)})`;
     if (s.last_error) text += ` · ⚠️ 갱신 실패: ${s.last_error}`;
+    if (s.extra_error) text += ` · ⚠️ 추가 출처 실패: ${s.extra_error}`;
     if (s.notify_error) text += ` · ⚠️ 알림 실패: ${s.notify_error}`;
     $('status').textContent = text;
   } catch (e) {
@@ -110,6 +112,7 @@ function statusBadge(it) {
     return el('span', 'badge warn', `작년 ${md(it.start)}~${md(it.end)} 모집 · 올해 모집 미확인`);
   }
   if (it.status === 'open') {
+    if (it.dday == null) return el('span', 'badge warn', `${md(it.start)} 공고 · 마감일은 공고 원문 확인`);
     if (it.dday === 0) return el('span', 'badge hot', '오늘 마감');
     return el('span', `badge ${it.dday <= 3 ? 'hot' : 'ok'}`, `D-${it.dday} · ${md(it.end)} 마감`);
   }
@@ -193,6 +196,10 @@ async function toggleDetail(card, it) {
     box.textContent = '';
     const meta = el('p', 'tiny muted', [d.org_type, d.category, d.product].filter(Boolean).join(' · '));
     box.append(meta);
+    if (d.notice_title) {
+      const where = d.period_from ? ` — 신청 기간은 ${d.period_from}에서 읽었습니다` : '';
+      box.append(el('p', 'tiny muted', `공고: ${d.notice_title}${d.posted ? ` (${d.posted} 게시)` : ''}${where}. 자동으로 읽은 날짜라 원문으로 한 번 더 확인해 주세요.`));
+    }
     const target = targetLines(d);
     if (target) {
       const sec = el('div', 'sec');
@@ -212,11 +219,14 @@ async function toggleDetail(card, it) {
         el('p', null, d.rounds.map((r) => `${r.start} ~ ${r.end}`).join('\n')));
       box.append(sec);
     }
-    if (d.url) {
-      const a = el('a', 'btn small', '기관 홈페이지 열기 ↗');
-      a.href = d.url; a.target = '_blank'; a.rel = 'noopener';
+    const links = [];
+    if (d.notice_url) links.push([d.notice_url, '공고 원문 열기 ↗']);
+    if (d.url) links.push([d.url, d.notice_title && !d.notice_url ? '공고 원문 열기 ↗' : '기관 홈페이지 열기 ↗']);
+    for (const [href, label] of links) {
+      const a = el('a', 'btn small', label);
+      a.href = href; a.target = '_blank'; a.rel = 'noopener';
       a.addEventListener('click', (ev) => ev.stopPropagation());
-      box.append(a);
+      box.append(a, ' ');
     }
   } catch (e) {
     box.textContent = '자세한 내용을 불러오지 못했습니다: ' + e.message;
@@ -227,7 +237,7 @@ function card(it) {
   const c = el('article', 'item');
   const head = el('div', 'head');
   const title = el('div', 'title');
-  title.append(el('span', 'org', it.org), el('strong', null, it.name));
+  title.append(el('span', 'org', it.org), el('strong', null, it.notice_title || it.name));
   head.append(title, starButton(it));
   const badges = el('div', 'tags');
   badges.append(statusBadge(it));
@@ -238,6 +248,8 @@ function card(it) {
   else if (it.purpose === 'living') badges.append(el('span', 'chip ok', '생활비'));
   else if (it.purpose === 'tuition') badges.append(el('span', 'chip', '등록금'));
   if (!it.mine) badges.append(el('span', 'chip dim', '조건 밖'));
+  if (it.source) badges.append(el('span', 'chip', it.source === '한국장학재단 포털' ? '새로 올라옴 · 포털' : it.source));
+  if ((it.period_from || '').startsWith('첨부')) badges.append(el('span', 'chip ok', '일정은 첨부 공고문에서 읽음'));
   c.append(head, badges);
   if (it.support) c.append(el('p', 'support', it.support));
   c.addEventListener('click', (ev) => {

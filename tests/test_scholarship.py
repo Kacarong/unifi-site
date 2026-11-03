@@ -251,7 +251,7 @@ def reset_store(items) -> None:
     shutil.rmtree(store.DIR, ignore_errors=True)
     os.makedirs(store.DIR, exist_ok=True)
     store._state = None
-    store._items = None
+    store._items = store._base = store._extras = None
     store.replace_items(items)
 
 

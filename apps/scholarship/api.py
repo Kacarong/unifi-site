@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from . import logic, source, store
-from .worker import build_message, now_kst, post_discord, sync, worker
+from .worker import build_message, now_kst, post_discord, sync, sync_extra, worker
 
 router = APIRouter()
 
@@ -47,6 +47,9 @@ def status() -> dict[str, Any]:
         "meta": state["meta"],
         "source_page": source.PAGE_URL,
         "last_sync_at": state["last_sync_at"],
+        "last_extra_at": state.get("last_extra_at", 0),
+        "extra_error": state.get("extra_error", ""),
+        "extra_count": sum(1 for it in items if it.get("source")),
         "last_check_at": state["last_check_at"],
         "last_error": state["last_error"],
         "notify_error": state.get("notify_error", ""),
@@ -62,6 +65,7 @@ def force_sync() -> dict[str, Any]:
         sync(force=True)
     except source.SourceError as exc:
         raise HTTPException(502, str(exc)) from exc
+    sync_extra()  # 실패는 extra_error 로 남는다
     return status()
 
 
@@ -140,7 +144,7 @@ def _slim(it: dict[str, Any], today, stars: set[str], profile: dict[str, Any]) -
     out = {
         k: it.get(k, "")
         for k in ("id", "series", "org", "name", "org_type", "category", "start", "end", "url",
-                  "expected_start", "expected_end")
+                  "expected_start", "expected_end", "source", "period_from", "notice_url", "notice_title")
         if k in it
     }
     out.update(

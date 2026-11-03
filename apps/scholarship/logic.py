@@ -229,6 +229,55 @@ def matches(profile: dict[str, Any], item: dict[str, Any]) -> bool:
     )
 
 
+# ---------------- 출처 합치기 ----------------
+_ORG_NOISE = re.compile(r"\(\s*(?:재|사|주)\s*\)|재단법인|사단법인|주식회사|\s+")
+
+
+def org_core(org: str) -> str:
+    """'(재)엔지니어링인재육성재단' → '엔지니어링인재육성재단'. 출처끼리 같은 기관인지 볼 때 쓴다."""
+    return _ORG_NOISE.sub("", org or "")
+
+
+def merge(base: list[dict[str, Any]], extras: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """CSV 목록에 포털·게시판에서 모은 것을 더한다. 이미 있는 장학금은 다시 넣지 않는다.
+
+    - 같은 회차(id)거나, 같은 장학금(series)에 마감일이 같으면 이미 있는 것.
+    - 게시판 공고는 이름이 공고 제목이다. 그 기관의 장학금이 하나뿐이면 그 장학금의 새 회차로 붙인다.
+      기관이 같고 마감일까지 같으면 같은 공고로 보고, 원래 항목에 공고 원문 주소만 붙인다.
+    """
+    out = list(base)
+    # 기관 → 그 기관의 장학금들. 하나뿐이면 게시판 공고를 그 장학금의 새 회차로 본다
+    # (☆ 가 이어지고 '작년 일정 참고' 에서도 빠진다).
+    series_of: dict[str, set[tuple[str, str]]] = {}
+    for it in base:
+        series_of.setdefault(org_core(it.get("org", "")), set()).add((it["series"], it["name"]))
+    ids = {it["id"] for it in out}
+    rounds = {(it["series"], it.get("end", "")) for it in out}
+    by_org_end: dict[tuple[str, str], int] = {}
+    for i, it in enumerate(out):
+        by_org_end.setdefault((org_core(it.get("org", "")), it.get("end", "")), i)
+    # 포털(구조화된 자료)을 게시판보다 먼저 — 같은 공고면 포털 쪽을 남긴다
+    for it in sorted(extras, key=lambda x: bool(x.get("notice_title"))):
+        if it["id"] in ids:
+            continue
+        hit = by_org_end.get((org_core(it.get("org", "")), it.get("end", ""))) if it.get("end") else None
+        if hit is not None and it.get("notice_title"):
+            out[hit] = {**out[hit], "notice_url": it["url"], "notice_title": it["notice_title"],
+                        "period_from": it.get("period_from", "")}
+            continue
+        same_org = series_of.get(org_core(it.get("org", "")), set())
+        if it.get("notice_title") and len(same_org) == 1:
+            series, name = next(iter(same_org))
+            it = {**it, "series": series, "name": name}
+        if (it["series"], it.get("end", "")) in rounds:
+            continue
+        out.append(it)
+        ids.add(it["id"])
+        rounds.add((it["series"], it.get("end", "")))
+        by_org_end.setdefault((org_core(it.get("org", "")), it.get("end", "")), len(out) - 1)
+    return out
+
+
 # ---------------- 작년 일정 참고 (올해 모집 미확인) ----------------
 def _plus_year(d: dt.date) -> dt.date:
     try:

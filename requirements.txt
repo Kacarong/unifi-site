@@ -10,3 +10,4 @@ PyMuPDF>=1.24            # 강의자료 PDF 글자 추출 (LLM 불필요)
 reportlab>=4.0           # 한글 정리본 PDF 조판
 python-multipart>=0.0.9  # PDF 업로드 폼 파싱
 httpx>=0.27              # LLM 프로바이더 호출
+olefile>=0.46            # 장학금 공고문 HWP(한글) 첨부에서 글자 추출

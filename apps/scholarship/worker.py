@@ -2,6 +2,8 @@
 
 한 시간마다 한 번 깬다.
   - 원본(공공데이터포털)은 6시간마다 파일 번호만 확인하고 바뀌었을 때만 받는다.
+  - 한국장학재단 실시간 포털과 공고 게시판(대한토목학회·재단)은 6시간마다 본다.
+    CSV 는 한 달에 한 번이라, 그 사이에 올라온 공고를 여기서 채운다.
   - 알림은 깨어날 때마다 고르되, 밤(22시~8시)에는 보내지 않고 아침까지 미룬다.
 """
 from __future__ import annotations
@@ -16,13 +18,14 @@ import urllib.request
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from . import logic, source, store
+from . import boards, kosaf, logic, source, store
 
 log = logging.getLogger("unifi.scholarship")
 
 KST = ZoneInfo("Asia/Seoul")
 TICK_SECONDS = 3600
 SYNC_EVERY_SECONDS = 6 * 3600
+EXTRA_EVERY_SECONDS = 6 * 3600
 QUIET_HOURS = (22, 8)  # 22시부터 다음날 8시 전까지는 보내지 않는다
 
 
@@ -46,6 +49,37 @@ def sync(force: bool = False) -> dict[str, Any]:
     except source.SourceError as exc:
         store.update({"last_error": str(exc), "last_sync_at": time.time()})
         raise
+
+
+def sync_extra(today: dt.date | None = None) -> dict[str, Any]:
+    """CSV 에 아직 없는 장학금을 포털·게시판에서 모은다. 한쪽이 실패해도 다른 쪽은 남긴다."""
+    today = today or now_kst().date()
+    base = store.base_items()
+    known = {(it["org"], it["name"], it.get("end", "")) for it in base}
+    errors: list[str] = []
+    prev = store.items()
+    prev_extra = [it for it in prev if it.get("source")]
+
+    cache = store.kosaf_cache()
+    try:
+        portal = kosaf.collect(known, cache, today)
+        # 캐시는 최근 것만 남긴다 — 마감이 오래 지난 것은 다시 볼 일이 없다
+        cutoff = (today - dt.timedelta(days=90)).isoformat()
+        store.save_kosaf_cache({k: v for k, v in cache.items() if (v.get("end") or "9") >= cutoff})
+    except source.SourceError as exc:
+        errors.append(str(exc))
+        portal = [it for it in prev_extra if it.get("source") == "한국장학재단 포털"]
+
+    try:
+        notices = boards.collect(today=today, log=log)
+    except Exception as exc:  # noqa: BLE001 - 게시판 쪽 예외로 포털 결과까지 잃지 않는다
+        errors.append(f"공고 게시판: {exc}")
+        notices = [it for it in prev_extra if it.get("notice_title") and it.get("source") != "한국장학재단 포털"]
+
+    store.replace_extras(portal + notices)
+    store.update({"last_extra_at": time.time(), "extra_error": " / ".join(errors)})
+    log.info("추가 출처: 포털 %d건, 게시판 %d건", len(portal), len(notices))
+    return {"portal": len(portal), "boards": len(notices), "errors": errors}
 
 
 # ---------------- 디스코드 ----------------
@@ -81,6 +115,8 @@ def _line(it: dict[str, Any], today: dt.date) -> str:
         when = f"{it['start'][5:].replace('-', '/')} 모집 시작"
     elif logic.status(it, today) == "year_round":
         when = f"연중 사업(~{it['end'][:10].replace('-', '/')}) · 지금 신청받는지는 공고 확인"
+    if it.get("source"):
+        when += f" · 출처 {it['source']}"
     support = (it.get("support") or "").replace("○", "").strip().splitlines()
     head = f"**{it['org']} · {it['name']}**"
     if it.get("url"):
@@ -106,7 +142,7 @@ def build_message(note: dict[str, Any], settings: dict[str, Any], site_url: str,
     embed: dict[str, Any] = {"title": title, "description": desc[:4000], "color": color}
     if site_url:
         embed["url"] = site_url.rstrip("/") + "/apps/scholarship/"
-    embed["footer"] = {"text": "출처: 한국장학재단 학자금지원정보 · 자격은 공고 원문으로 꼭 확인하세요"}
+    embed["footer"] = {"text": "출처: 한국장학재단 학자금지원정보·포털, 대한토목학회·재단 공고 · 자격은 공고 원문으로 꼭 확인하세요"}
 
     payload: dict[str, Any] = {"embeds": [embed]}
     mention = _mention(settings.get("discord_mention", ""))
@@ -197,6 +233,11 @@ class Worker:
                 log.warning("장학금 원본 갱신 실패: %s", exc)
             except Exception:  # noqa: BLE001 - 루프는 죽지 않는다
                 log.exception("장학금 동기화 예외")
+            try:
+                if time.time() - store.snapshot().get("last_extra_at", 0) >= EXTRA_EVERY_SECONDS:
+                    sync_extra()
+            except Exception:  # noqa: BLE001
+                log.exception("추가 출처 동기화 예외")
             try:
                 check()
             except Exception:  # noqa: BLE001
