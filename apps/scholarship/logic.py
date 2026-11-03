@@ -159,12 +159,27 @@ _TUITION = re.compile(r"등록금|수업료|입학금|학비")
 _LOAN = re.compile(r"대출|대부|융자")
 
 
+# '생활비 지원 불가', '생활비는 제외' 처럼 부정하는 말은 생활비로 세지 않는다
+_NEGATED = re.compile(
+    "(?:" + _LIVING.pattern + r")[^○※\n]{0,12}?(?:불가|제외|미지원|불포함|지원\s*안|지원하지\s*않|해당\s*없|아님)"
+)
+
+
 def purpose(item: dict[str, Any]) -> str:
-    """living(생활비가 들어 있음) / tuition(등록금 전용) / unclear(금액만 적힘)."""
-    text = f"{item.get('name', '')} {item.get('support', '')}"
-    if _LIVING.search(text):
+    """living(생활비가 들어 있음) / tuition(등록금 전용) / unclear(금액만 적힘).
+
+    지원 내용을 기준으로 본다. 이름('학업장려 장학금')은 지원 내용에 용도가 전혀
+    안 적혀 있을 때만 본다 — 이름이 그래도 실제로는 등록금으로 주는 경우가 있다.
+    """
+    support = _NEGATED.sub(" ", item.get("support") or "")
+    if _LIVING.search(support):
         return "living"
-    if _TUITION.search(text):
+    if _TUITION.search(support):
+        return "tuition"
+    name = _NEGATED.sub(" ", item.get("name") or "")
+    if _LIVING.search(name):
+        return "living"
+    if _TUITION.search(name):
         return "tuition"
     return "unclear"
 
@@ -182,16 +197,23 @@ def _purpose_ok(choice: str, item: dict[str, Any]) -> bool:
     return True
 
 
+def excluded(profile: dict[str, Any], item: dict[str, Any]) -> bool:
+    """대출·지원 용도는 사용자가 '이건 아예 안 받겠다' 고 정한 것이다.
+    관심 표시와 상관없이 목록에서도 알림에서도 뺀다."""
+    if profile.get("exclude_loans", True) and is_loan(item):
+        return True
+    return not _purpose_ok(profile.get("purpose", ""), item)
+
+
 def matches(profile: dict[str, Any], item: dict[str, Any]) -> bool:
     """내 조건에 맞는가. 지역은 내 지역이거나 전국인 것만 — 어느 읍·면 것인지 모르는
     장학금은 대부분 남의 동네 것이라 뺀다('내 조건만' 을 끄면 '지역 확인 필요' 로 보인다)."""
+    if excluded(profile, item):
+        return False
     if region_verdict(profile, item) in ("no", "unknown"):
         return False
-    if profile.get("exclude_loans", True) and is_loan(item):
-        return False
     return (
-        _purpose_ok(profile.get("purpose", ""), item)
-        and _level_ok(profile.get("level", ""), item.get("grades") or [])
+        _level_ok(profile.get("level", ""), item.get("grades") or [])
         and _pick_ok(profile.get("school", ""), item.get("schools") or [], "특정대학")
         and _pick_ok(profile.get("field", ""), item.get("fields") or [], "특정학과")
     )
@@ -249,14 +271,15 @@ def plan_notifications(
 ) -> list[dict[str, Any]]:
     """보낼 알림 목록. 각 항목은 {kind, keys, items, ...}.
 
-    - star_new : 관심 장학금에 새 회차가 올라왔다 (내 조건과 상관없이)
+    - star_new : 관심 장학금에 새 회차가 올라왔다 (지역·학년 조건과 상관없이,
+                 단 대출·지원 용도로 뺀 것은 관심이어도 보내지 않는다)
     - new      : 내 조건에 맞는 새 장학금 묶음 (한 번에 하나의 메시지)
     - due      : 관심 장학금 마감 임박
     'keys' 는 보낸 뒤 sent 에 넣어 다시 보내지 않게 하는 표식이다.
     """
     star_set = set(stars)
     out: list[dict[str, Any]] = []
-    live = [it for it in items if status(it, today) != "closed"]
+    live = [it for it in items if status(it, today) != "closed" and not excluded(profile, it)]
     fresh = [it for it in live if it["id"] not in known_ids]
 
     starred_new = []

@@ -191,8 +191,12 @@ def list_items(view: str = "open", mine: bool = True, q: str = "", category: str
     if category:
         pool = [it for it in pool if it.get("category") == category]
     if mine:
-        # 관심 표시한 것은 조건과 상관없이 늘 보인다
-        pool = [it for it in pool if it["series"] in stars or logic.matches(profile, it)]
+        # 관심 표시한 것은 지역·학년 조건과 상관없이 보인다. 대출·지원 용도로
+        # 뺀 것은 관심이어도 뺀다 — '대출 제외' 라고 했는데 대출이 보이면 안 된다.
+        pool = [
+            it for it in pool
+            if not logic.excluded(profile, it) and (it["series"] in stars or logic.matches(profile, it))
+        ]
 
     counts = {v: len(_view(v, pool, today, stars)) for v in VIEWS}
     rows = _view(view, pool, today, stars)

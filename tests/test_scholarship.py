@@ -177,6 +177,12 @@ def test_purpose_and_loans() -> None:
     check("근로 시급도 생활비", logic.purpose(work), "living")
     check("등록금 전용", logic.purpose(tuition), "tuition")
     check("금액만 적힌 것", logic.purpose(cash), "unclear")
+    check("이름이 '학업장려' 여도 지원 내용이 등록금이면 등록금",
+          logic.purpose(sup("○ 등록금 범위 내 지원", name="학업장려 장학금")), "tuition")
+    check("지원 내용에 용도가 없으면 이름으로 판단",
+          logic.purpose(sup("○ 100만원", name="생활비 장학금")), "living")
+    check("'생활비 지원 불가' 는 생활비가 아님", logic.purpose(sup("○ 등록금 300만원 ※ 생활비 지원 불가")), "tuition")
+    check("'(생활비 제외)' 도 생활비가 아님", logic.purpose(sup("○ 대출 이자 (생활비 제외)")), "unclear")
 
     only_living = {"purpose": "living"}
     check("생활비만: 생활비 통과", logic.matches(only_living, living), True)
@@ -191,6 +197,21 @@ def test_purpose_and_loans() -> None:
     check("장학금은 대출 아님", logic.is_loan(living), False)
     check("기본으로 대출을 뺌", logic.matches({}, loan), False)
     check("대출 빼기를 끄면 보임", logic.matches({"exclude_loans": False}, loan), True)
+
+    # 관심 표시해도 대출·지원 용도로 뺀 것은 알림이 안 간다
+    me = {"exclude_loans": True, "purpose": "living"}
+    today = dt.date(2026, 11, 3)
+    settings = {"notify_new": True, "notify_starred": True, "reminder_days": [7, 3, 1]}
+    soon_loan = item("재단", "관심 대출", "2026-11-01", "2026-11-05")
+    soon_loan["product"] = "학자금"
+    soon_tuition = item("재단", "관심 등록금", "2026-11-01", "2026-11-05")
+    soon_tuition["support"] = "○ 등록금 전액"
+    notes = logic.plan_notifications(
+        [soon_loan, soon_tuition], profile=me, settings=settings,
+        stars=[soon_loan["series"], soon_tuition["series"]], known_ids=set(), sent=set(), today=today,
+    )
+    check("관심이어도 대출·등록금 전용은 새 회차·마감 알림 없음", notes, [])
+    check("관심이어도 대출은 제외 대상", logic.excluded(me, soon_loan), True)
 
 
 def test_forecast() -> None:
