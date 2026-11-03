@@ -84,6 +84,20 @@ python scripts/build.py mysite
 
 빌드 전에는 포털에 **빌드 필요** 로 표시됩니다.
 
+## 4. 서버 렌더링 앱 (Jinja 템플릿 등)
+
+화면을 서버가 그려서 `/apps/<id>/` 아래 경로를 직접 가져야 하면 `mount` 를 쓴다.
+FastAPI 앱을 받아 라우터·정적 파일을 스스로 붙인다. 예: `apps/housing/app.py`.
+
+```python
+def _mount(app):
+    from .web import build_router   # 무거운 import 는 여기 안쪽에서
+    app.include_router(build_router(prefix="/apps/mysite"))
+
+
+SPEC = AppSpec(id="mysite", name="내 사이트", mount=_mount)
+```
+
 ## 규칙 몇 가지
 
 - **폴더 이름 = 앱 id** 이고, 파이썬 식별자여야 합니다(영문 소문자·숫자·언더스코어).

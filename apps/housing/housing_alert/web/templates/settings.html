@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}설정{% endblock %}
+{% block content %}
+<h1>설정</h1>
+
+<section class="card" id="bot">
+  <h2>디스코드 봇 DM</h2>
+  <p>현재: {% if bot_token_masked and dm_user_id %}<code>{{ bot_token_masked }}</code> → 사용자 <code>{{ dm_user_id }}</code> <span class="badge">기본 알림은 DM으로 발송</span>{% else %}<span class="badge muted">미설정 — 기본 알림은 웹훅으로 발송</span>{% endif %}</p>
+  <form method="post" action="{{ base }}/settings/bot" class="inline-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input name="bot_token" type="password" placeholder="{% if bot_token_masked %}봇 토큰 (비우면 기존 값 유지){% else %}봇 토큰{% endif %}" autocomplete="off">
+    <input name="dm_user_id" placeholder="받는 사람 사용자 ID" value="{{ dm_user_id }}" inputmode="numeric" autocomplete="off">
+    <button class="primary" name="action" value="save">저장</button>
+    {% if bot_token_masked %}<button name="action" value="clear" class="danger" formnovalidate>지우기</button>{% endif %}
+  </form>
+  <form method="post" action="{{ base }}/settings/bot/test"><input type="hidden" name="csrf" value="{{ csrf }}"><button {% if not (bot_token_masked and dm_user_id) %}disabled{% endif %}>테스트 발송</button></form>
+</section>
+
+<section class="card" id="webhook">
+  <h2>디스코드 웹훅</h2>
+  <p>현재: {% if webhook_masked %}<code>{{ webhook_masked }}</code>{% if webhook_from_env %} <span class="muted small">(환경변수 값)</span>{% endif %}{% else %}<span class="badge muted">미설정 — 알림은 미발송으로 쌓임</span>{% endif %}</p>
+  <form method="post" action="{{ base }}/settings/webhook" class="inline-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input name="webhook_url" placeholder="https://discord.com/api/webhooks/..." autocomplete="off">
+    <button class="primary" name="action" value="save">저장</button>
+    {% if webhook_masked and not webhook_from_env %}<button name="action" value="clear" class="danger" formnovalidate>지우기</button>{% endif %}
+  </form>
+  <form method="post" action="{{ base }}/settings/webhook/test"><input type="hidden" name="csrf" value="{{ csrf }}"><button {% if not webhook_masked %}disabled{% endif %}>테스트 발송</button></form>
+</section>
+
+<section class="card" id="backlog">
+  <h2>밀린 알림 <span class="badge {% if backlog %}warn{% else %}muted{% endif %}">{{ backlog }}건</span></h2>
+  <form method="post" action="{{ base }}/settings/backlog" class="actions">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="primary" name="action" value="send" {% if not backlog or not delivery_ready %}disabled{% endif %}>모두 보내기</button>
+    <button class="danger" name="action" value="discard" {% if not backlog %}disabled{% endif %} onclick="return confirm('밀린 알림을 모두 버릴까요?')">모두 버리기</button>
+  </form>
+</section>
+
+<section class="card" id="health">
+  <h2>정상 작동 점검</h2>
+  <p>15분마다 수집과 봇 토큰을 점검하고, 수집이 멈췄으면 그 자리에서 다시 돌립니다. 자동 복구에 실패하면 DM으로 알립니다.</p>
+  <p>마지막 점검: {% if health.last_check_at %}{{ health.last_check_at[:16].replace('T', ' ') }}{% else %}아직 없음{% endif %}
+    {% if health.issues %}<span class="badge warn">장애 {{ health.issues|length }}건</span>{% for k, v in health.issues.items() %}<br><span class="small">{{ health_labels.get(k, k) }}: {{ v.detail }}{% if not v.alerted %} (알림 못 보냄){% endif %}</span>{% endfor %}{% elif health.last_check_at %}<span class="badge">정상</span>{% endif %}</p>
+  <form method="post" action="{{ base }}/settings/report" class="inline-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label><input type="checkbox" name="enabled" value="1" {% if report.enabled %}checked{% endif %}> 하루 한 번 '정상 작동 중' 요약 받기</label>
+    <label>시각 <input type="number" name="hour" min="0" max="23" value="{{ report.hour }}" style="width:5em">시</label>
+    <button class="primary">저장</button>
+  </form>
+</section>
+
+<section class="card" id="apikey">
+  <h2>공공데이터포털 인증키</h2>
+  <p>현재: {% if key_masked %}<code>{{ key_masked }}</code>{% if key_from_env %} <span class="muted small">(환경변수 값)</span>{% endif %}{% else %}<span class="badge muted">키 미설정 — API 수집기 건너뜀</span>{% endif %}</p>
+  <form method="post" action="{{ base }}/settings/apikey" class="inline-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input name="api_key" placeholder="인증키" autocomplete="off">
+    <button class="primary" name="action" value="save">저장</button>
+    {% if key_masked and not key_from_env %}<button name="action" value="clear" class="danger">지우기</button>{% endif %}
+  </form>
+</section>
+
+<section class="card">
+  <h2>수집 주기</h2>
+  <form method="post" action="{{ base }}/settings/schedule" class="grid2">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>주간 간격(분)<input type="number" name="day_interval_min" min="30" value="{{ schedule.day_interval_min }}"></label>
+    <label>야간 간격(분)<input type="number" name="night_interval_min" min="30" value="{{ schedule.night_interval_min }}"></label>
+    <label>야간 시작(시)<input type="number" name="night_start_hour" min="0" max="23" value="{{ schedule.night_start_hour }}"></label>
+    <label>야간 끝(시)<input type="number" name="night_end_hour" min="0" max="23" value="{{ schedule.night_end_hour }}"></label>
+    <label>요약 메시지 기준(건 초과)<input type="number" name="summary_threshold" min="1" value="{{ summary_threshold }}"></label>
+    <div class="full"><button class="primary">저장</button></div>
+  </form>
+</section>
+
+<section class="card">
+  <h2>협동조합 의심 키워드</h2>
+  <form method="post" action="{{ base }}/settings/keywords">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <textarea name="keywords" rows="10">{{ keywords }}</textarea>
+    <div class="actions"><button class="primary" name="action" value="save">저장</button><button name="action" value="reset">기본값으로</button></div>
+  </form>
+</section>
+{% endblock %}

@@ -45,6 +45,9 @@ class AppSpec:
     static_dir: Optional[str] = None
     # /api/<id> 로 마운트할 APIRouter 를 돌려주는 함수 (지연 import 용)
     router_factory: Optional[Callable[[], object]] = None
+    # 서버 렌더링 앱처럼 /apps/<id> 아래 경로를 직접 붙여야 할 때. FastAPI 앱을 받아
+    # 라우터·정적 파일을 스스로 붙인다(지연 import 는 이 함수 안에서).
+    mount: Optional[Callable[[object], None]] = None
     # 프론트 빌드 정보
     build: Optional[BuildSpec] = None
     # 앱 전용 추가 의존성 파일 (앱 폴더 기준)
@@ -102,7 +105,7 @@ class AppSpec:
             "status": self.status,
             "error": self.error,
             "notes": self.notes,
-            "url": f"/apps/{self.id}/" if self.has_frontend else None,
+            "url": f"/apps/{self.id}/" if self.has_frontend or (self.mount and not self.error) else None,
             "api": f"/api/{self.id}" if self.router_factory else None,
         }
 

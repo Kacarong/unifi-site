@@ -47,6 +47,13 @@ def _mount_apps() -> None:
                 spec.error = traceback.format_exc(limit=3)
                 log.warning("app %-10s API 등록 실패 (의존성 미설치?)\n%s", spec.id, spec.error)
 
+        if spec.mount:
+            try:
+                spec.mount(app)
+            except Exception:
+                spec.error = traceback.format_exc(limit=3)
+                log.warning("app %-10s 붙이기 실패 (의존성 미설치?)\n%s", spec.id, spec.error)
+
         if spec.has_frontend:
             app.mount(
                 f"/apps/{spec.id}",

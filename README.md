@@ -20,10 +20,12 @@
 | 🎟️ `cgvmacro` | CGV 취소표·상영오픈 감시와 디스코드 알림 | 서버 감시 + 로컬 PC 선점 에이전트 |
 | 🎓 `scholarship` | 대학생 장학금 모음 + 관심 장학금 마감·다음 모집 디스코드 알림 | 서버 백그라운드 (추가 설치 없음) |
 | 🎖️ `wargame` | 2026·1980년 시작 국가 전략 게임 (실제 세계지도·실존 무기) | 프론트엔드 전용, 소스는 별도 저장소에서 빌드해 `~/wargame-site` 에 배포 (`WARGAME_DIST` 로 변경) |
+| 🏠 `housing` | LH·SH·GH·청약홈 임대·분양 공고 모음 + 필터에 맞는 새 공고 디스코드 알림 | 서버 렌더링 화면 + 서버 백그라운드 (`selectolax`·`jinja2`) |
 
 원본 레포: [geoglobe](https://github.com/Kacarong/geoglobe) ·
 [ex-video](https://github.com/Kacarong/ex-video) ·
-[cgv-macro](https://github.com/Kacarong/cgv-macro)
+[cgv-macro](https://github.com/Kacarong/cgv-macro) ·
+[housing-alert](https://github.com/Kacarong/housing-alert)
 
 ## 실행
 
@@ -251,6 +253,20 @@ CSV 를 다시 받는다.
 
 한계: 대학 자체 장학금과 학과장 추천 장학금은 대부분 학교·학과 게시판에만 공지된다.
 자동으로 읽은 날짜는 원문으로 한 번 더 확인해야 한다(본문이 이미지뿐인 공고는 못 읽는다).
+
+## 임대·분양 공고 알림 (`housing`)
+
+원래 따로 돌던 housing-alert(housing.kacarong.kr, systemd 타이머 셋)를 그대로 옮겨 왔다.
+패키지는 `apps/housing/housing_alert/` 에 있고, 화면은 서버 렌더링이라 `/apps/housing/` 아래에
+라우터를 직접 붙인다(`AppSpec.mount`). 데이터는 `data/housing/housing_alert.db` 하나다.
+봇 토큰·DM 받는 사람·웹훅·공공데이터포털 키는 모두 이 DB 에 있고 웹 **설정**에서 바꾼다.
+
+- 수집: 서버 안 스레드가 30분마다 깨어나고, 실제로 받을지는 웹 설정의 간격(주간 60분·야간 180분)과
+  출처별 실패 백오프로 정한다. '지금 수집' 버튼도 같은 스레드 방식으로 돈다.
+- 점검: 15분마다 수집이 멈췄는지(멈췄으면 그 자리에서 한 번 수집)와 봇 토큰을 본다.
+  웹·터널이 살아 있는지는 unifi-site.service 가 맡으므로 보지 않는다.
+- 테스트: `.venv/bin/python -m pytest -q apps/housing/tests` (출처별 실제 HTML 픽스처 포함).
+  출처 조사·파싱 규칙은 [apps/housing/SOURCES.md](apps/housing/SOURCES.md).
 
 ## 공개 배포
 

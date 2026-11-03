@@ -1,0 +1,2 @@
+selectolax>=1.0        # LH·SH·GH 목록/상세 HTML 파싱
+jinja2>=3.1            # 서버 렌더링 화면
