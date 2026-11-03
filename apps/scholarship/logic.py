@@ -248,10 +248,13 @@ def latest_rounds(items: Iterable[dict[str, Any]]) -> dict[str, dict[str, Any]]:
 
 
 def forecast(items: Iterable[dict[str, Any]], today: dt.date, horizon: int = 60) -> list[dict[str, Any]]:
-    """작년 이맘때 모집했는데 올해 회차가 아직 안 올라온 장학금.
+    """작년 일정으로 보면 앞으로 열릴 장학금(올해 회차는 아직 목록에 없는 것).
 
-    원본이 한 달에 한 번 갱신되므로 이미 모집이 시작됐는데 목록에만 아직 없는
-    경우도 있다. 그래서 '작년 기준으로 지금 모집 중이었을' 것도 같이 보여 준다.
+    작년 기준으로 이미 모집이 시작됐을 것은 넣지 않는다. 원본에 올해 회차가
+    없다고 아직 안 열린 게 아니다 — 재단이 일정을 몇 주 당기거나(한국고등교육재단
+    인재림: 작년 10/28~11/24 → 올해 10/8~10/29), 학교 추천 마감이 재단보다
+    빠르거나(한국지도자육성장학재단: 학교 마감 10/26~10/30), 원본에 아예 안
+    올라오는 경우가 많아서, 이런 걸 '곧 열림' 에 두면 대부분 이미 끝난 것이 된다.
     """
     out = []
     for it in latest_rounds(items).values():
@@ -261,7 +264,7 @@ def forecast(items: Iterable[dict[str, Any]], today: dt.date, horizon: int = 60)
         if (today - start).days < 300:
             continue  # 올해 회차가 이미 끝난 것 — 다음은 내년
         exp_start, exp_end = _plus_year(start), _plus_year(end)
-        if exp_end < today or exp_start > today + dt.timedelta(days=horizon):
+        if exp_start <= today or exp_start > today + dt.timedelta(days=horizon):
             continue
         out.append({**it, "expected_start": exp_start.isoformat(), "expected_end": exp_end.isoformat()})
     out.sort(key=lambda x: x["expected_start"])
