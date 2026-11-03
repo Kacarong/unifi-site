@@ -2,7 +2,7 @@
 
 - 모집 상태와 D-day
 - 내 조건에 맞는지
-- 작년 일정으로 본 '곧 열릴' 장학금
+- 작년 일정으로 본 '작년 일정 참고' 장학금 (올해 모집은 미확인)
 - 보낼 알림 고르기
 """
 from __future__ import annotations
@@ -229,7 +229,7 @@ def matches(profile: dict[str, Any], item: dict[str, Any]) -> bool:
     )
 
 
-# ---------------- 곧 열릴 장학금 ----------------
+# ---------------- 작년 일정 참고 (올해 모집 미확인) ----------------
 def _plus_year(d: dt.date) -> dt.date:
     try:
         return d.replace(year=d.year + 1)
@@ -254,7 +254,8 @@ def forecast(items: Iterable[dict[str, Any]], today: dt.date, horizon: int = 60)
     없다고 아직 안 열린 게 아니다 — 재단이 일정을 몇 주 당기거나(한국고등교육재단
     인재림: 작년 10/28~11/24 → 올해 10/8~10/29), 학교 추천 마감이 재단보다
     빠르거나(한국지도자육성장학재단: 학교 마감 10/26~10/30), 원본에 아예 안
-    올라오는 경우가 많아서, 이런 걸 '곧 열림' 에 두면 대부분 이미 끝난 것이 된다.
+    올라오는 경우가 많아서, 이런 걸 넣으면 대부분 이미 끝난 것이 된다.
+    남은 것도 올해 모집이 확인된 것은 아니므로 화면에는 '작년 일정 참고' 로만 보여 준다.
     """
     out = []
     for it in latest_rounds(items).values():

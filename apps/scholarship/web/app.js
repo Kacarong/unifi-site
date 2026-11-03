@@ -7,7 +7,7 @@ const state = { view: 'open', offset: 0, options: null, profile: null, seq: 0 };
 const VIEW_HINT = {
   open: '지금 신청할 수 있는 장학금입니다. 마감이 가까운 순서. 학교 추천을 거치는 장학금은 학교 마감이 더 빠를 수 있습니다.',
   year_round: '공고 기간이 1년 가까이 잡힌 사업입니다. 국가근로·멘토링 장학금처럼 실제 신청은 학기마다 짧게 따로 받는 경우가 많아서, 지금 신청할 수 있는지는 기관 공고에서 꼭 확인하세요.',
-  soon: '작년 일정으로 보면 앞으로 두 달 안에 모집을 시작할 장학금입니다. 날짜는 작년 일정에 1년을 더해 짐작한 것이라 몇 주 당겨질 수 있고, 학교 추천을 거치는 장학금은 학교 마감이 더 빠릅니다. ☆ 해 두면 실제 모집이 올라올 때 알려 드립니다.',
+  soon: '작년엔 지금부터 두 달 안에 모집을 시작했는데, 올해 공고는 아직 목록에 없는 장학금입니다. 올해 모집은 확인되지 않았습니다. 일정이 당겨져 이미 끝났을 수도 있고, 학교 추천을 거치는 장학금은 학교 마감이 더 빠르니 기관·학교 공지에서 꼭 확인하세요. ☆ 해 두면 올해 모집이 목록에 올라올 때 알려 드립니다.',
   starred: '관심 표시한 장학금입니다. 내 조건과 상관없이 늘 보입니다.',
   all: '받아 둔 장학금 전부입니다(지난 회차 포함). 최근에 모집한 순서.',
 };
@@ -106,7 +106,9 @@ async function saveProfile() {
 
 // ---------------- 목록 ----------------
 function statusBadge(it) {
-  if (it.expected_start) return el('span', 'badge', `${md(it.expected_start)}쯤 열릴 듯`);
+  if (it.expected_start) {
+    return el('span', 'badge warn', `작년 ${md(it.start)}~${md(it.end)} 모집 · 올해 모집 미확인`);
+  }
   if (it.status === 'open') {
     if (it.dday === 0) return el('span', 'badge hot', '오늘 마감');
     return el('span', `badge ${it.dday <= 3 ? 'hot' : 'ok'}`, `D-${it.dday} · ${md(it.end)} 마감`);
