@@ -241,8 +241,11 @@ def test_forecast() -> None:
     old_e = item("재단E", "모집 중", "2025-10-20", "2025-11-20")
     got = logic.forecast([last_year, running_now, too_far, done_this_year, old_d, open_now, old_e], TODAY)
     # 재단B 는 작년 기준이면 지금 모집 중이어야 하지만 올해 일정은 알 수 없다 —
-    # 당겨졌거나 학교 마감이 지났을 수 있으니 '곧 열림' 에 넣지 않는다
-    check("작년 일정으로 앞으로 60일 안에 시작할 것만", [f["org"] for f in got], ["재단A"])
+    # 지우지 않고 '이미 시작했을 것' 으로 뒤에 둔다
+    check("앞으로 열릴 것 먼저, 작년 기준 이미 시작했을 것은 뒤에", [(f["org"], f["started"]) for f in got],
+          [("재단A", False), ("재단B", True)])
+    closed = logic.recently_closed([done_this_year, open_now, old_d, item("재단F", "10월 마감", "2026-10-01", "2026-10-30")], TODAY)
+    check("최근 마감은 지우지 않고 최근 마감 순으로", [f["org"] for f in closed], ["재단F", "재단D"])
     check("예상 날짜는 작년 날짜 + 1년", (got[0]["expected_start"], got[0]["expected_end"]),
           ("2026-11-10", "2026-11-30"))
 

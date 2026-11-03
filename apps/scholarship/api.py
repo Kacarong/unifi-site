@@ -6,12 +6,14 @@ from typing import Any, Optional
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from . import logic, source, store
+import hashlib
+
+from . import boards, logic, source, store
 from .worker import build_message, now_kst, post_discord, sync, sync_extra, worker
 
 router = APIRouter()
 
-VIEWS = ("open", "year_round", "soon", "starred", "all")
+VIEWS = ("open", "year_round", "soon", "closed", "starred", "all")
 
 
 class ProfilePatch(BaseModel):
@@ -33,6 +35,15 @@ class SettingsPatch(BaseModel):
 
 class StarBody(BaseModel):
     on: bool = True
+
+
+class SourceBody(BaseModel):
+    url: str
+    label: str = ""
+
+
+class SourceToggle(BaseModel):
+    enabled: bool
 
 
 # ---------------- 상태 ----------------
@@ -144,7 +155,7 @@ def _slim(it: dict[str, Any], today, stars: set[str], profile: dict[str, Any]) -
     out = {
         k: it.get(k, "")
         for k in ("id", "series", "org", "name", "org_type", "category", "start", "end", "url",
-                  "expected_start", "expected_end", "source", "period_from", "notice_url", "notice_title")
+                  "expected_start", "expected_end", "started", "source", "period_from", "notice_url", "notice_title")
         if k in it
     }
     out.update(
@@ -178,6 +189,8 @@ def _view(view: str, items: list[dict[str, Any]], today, stars: set[str]) -> lis
         return sorted(rows, key=lambda it: it.get("end", ""))
     if view == "soon":
         return logic.forecast(items, today)
+    if view == "closed":
+        return logic.recently_closed(items, today)
     if view == "starred":
         latest = logic.latest_rounds(it for it in items if it["series"] in stars)
         order = {"open": 0, "year_round": 1, "upcoming": 2, "closed": 3}
@@ -238,3 +251,59 @@ def star(series: str, body: StarBody) -> dict[str, Any]:
     if body.on and not any(it["series"] == series for it in store.items()):
         raise HTTPException(404, "장학금을 찾지 못했습니다")
     return {"stars": store.set_star(series, body.on)}
+
+
+# ---------------- 공고 게시판 출처 ----------------
+def _sources_view() -> list[dict[str, Any]]:
+    state = store.snapshot()
+    stats = state.get("source_stats") or {}
+    return [
+        {k: b.get(k) for k in ("id", "label", "url", "builtin", "enabled")} | {"stat": stats.get(b["id"])}
+        for b in boards.all_sources(state)
+    ]
+
+
+@router.get("/sources")
+def list_sources() -> dict[str, Any]:
+    return {"sources": _sources_view()}
+
+
+@router.post("/sources")
+def add_source(body: SourceBody) -> dict[str, Any]:
+    """게시판 주소를 더한다. 먼저 읽어 보고, 날짜가 붙은 글 목록을 못 찾으면 더하지 않는다."""
+    url = body.url.strip()
+    try:
+        got = boards.probe(url, now_kst().date())
+    except boards.BlockedURL as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(502, f"게시판을 열지 못했습니다: {exc}") from exc
+    if not got["posts"]:
+        raise HTTPException(422, "이 주소에서 날짜가 붙은 글 목록을 찾지 못했습니다. 게시판 목록 화면의 주소인지 확인해 주세요")
+    sid = "custom_" + hashlib.sha1(url.encode("utf-8")).hexdigest()[:10]
+    label = body.label.strip()[:40] or got["title"] or url[:40]
+    # 사용자가 고른 게시판은 대개 장학 게시판이거나 '장학' 검색 결과라 제목 조건을 느슨하게 둔다
+    store.add_source({"id": sid, "label": label, "org": label, "url": url, "loose": True})
+    return {"sources": _sources_view(), "probe": got}
+
+
+@router.patch("/sources/{source_id}")
+def toggle_source(source_id: str, body: SourceToggle) -> dict[str, Any]:
+    if not any(b["id"] == source_id for b in boards.all_sources(store.snapshot())):
+        raise HTTPException(404, "출처를 찾지 못했습니다")
+    store.set_source_on(source_id, body.enabled)
+    return {"sources": _sources_view()}
+
+
+@router.delete("/sources/{source_id}")
+def delete_source(source_id: str) -> dict[str, Any]:
+    if not store.remove_source(source_id):
+        raise HTTPException(404, "직접 더한 출처만 지울 수 있습니다")
+    return {"sources": _sources_view()}
+
+
+@router.post("/sources/refresh")
+def refresh_sources() -> dict[str, Any]:
+    """출처를 바꾼 뒤 바로 다시 모은다(포털 포함, 1분 남짓)."""
+    got = sync_extra()
+    return {"sources": _sources_view(), **got}

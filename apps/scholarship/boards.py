@@ -16,7 +16,9 @@ import datetime as dt
 import hashlib
 import html
 import http.cookiejar
+import ipaddress
 import re
+import socket
 import urllib.parse
 import urllib.request
 from typing import Any
@@ -31,13 +33,31 @@ BOARDS: list[dict[str, Any]] = [
         "id": "ksce_news",
         "label": "대한토목학회 토목계소식",
         "org": "대한토목학회",
+        "bracket_org": True,  # '[엔지니어링인재육성재단] …' — 외부 기관 공고를 대신 올린다
         "url": "https://www.ksce.or.kr/not/default.asp?gbn=10&htop=MN0031&ctop=MN0096&ptop=MN0031&sfield=2&gtxt=%EC%9E%A5%ED%95%99",
     },
     {
         "id": "ksce_notice",
         "label": "대한토목학회 공지사항",
         "org": "대한토목학회",
+        "bracket_org": True,
         "url": "https://www.ksce.or.kr/not/default.asp?gbn=6&htop=MN0031&ctop=MN0048&ptop=MN0031&sfield=2&gtxt=%EC%9E%A5%ED%95%99",
+    },
+    # 학교 게시판은 검색어('장학')로 이미 걸러져 있고 제목이 '○○ 장학금' 처럼 짧아서
+    # '모집·선발' 낱말이 없어도 받는다(loose). 대신 게시일이 있는 글만.
+    {
+        "id": "pknu_civil",
+        "label": "부경대 토목공학과",
+        "org": "부경대학교 토목공학과",
+        "url": "https://civil.pknu.ac.kr/civil/5346?pageIndex=1&bbsId=2402698&searchCondition=title&searchKeyword=%EC%9E%A5%ED%95%99",
+        "loose": True,
+    },
+    {
+        "id": "pknu_main",
+        "label": "부경대 등록·장학 공지",
+        "org": "부경대학교",
+        "url": "https://www.pknu.ac.kr/main/163?cd=10004",
+        "loose": True,
     },
     {
         "id": "yonkang",
@@ -65,25 +85,85 @@ BOARDS: list[dict[str, Any]] = [
     },
 ]
 
+def all_sources(state: dict[str, Any]) -> list[dict[str, Any]]:
+    """기본 게시판 + 사용자가 더한 게시판. 각각 enabled·builtin 표시를 붙인다."""
+    off = set(state.get("sources_off") or [])
+    out = [{**b, "builtin": True} for b in BOARDS]
+    out += [{"org": c.get("label", ""), **c, "builtin": False} for c in state.get("custom_sources") or []]
+    return [{**b, "enabled": b["id"] not in off} for b in out]
+
+
+def active_sources(state: dict[str, Any]) -> list[dict[str, Any]]:
+    return [b for b in all_sources(state) if b["enabled"]]
+
+
+def probe(url: str, today: dt.date | None = None) -> dict[str, Any]:
+    """게시판 주소를 더하기 전에 한 번 읽어 본다 — 글 목록을 찾았는지, 장학 글이 몇 개인지."""
+    today = today or dt.date.today()
+    f = Fetcher()
+    data, final_url, ctype = f.get(url)
+    page = decode_html(data, ctype)
+    posts = list_posts(page, final_url)
+    dated = [p for p in posts if p["posted"]]
+    title = re.search(r"(?is)<title[^>]*>(.*?)</title>", page)
+    return {
+        "posts": len(dated),
+        "scholarship": [clean_title(p["title"]) for p in pick({"loose": True}, posts, today)][:5],
+        "title": _text(title.group(1))[:60] if title else "",
+    }
+
+
 # 제목 고르기
 _WANT = re.compile(r"장학")
 _RECRUIT = re.compile(r"모집|선발|공고|공모|추천")
-_SKIP = re.compile(r"결과|발표|합격|명단|수여식|증서|기부금|후기|수기|간담회|워크숍|연구|논문|채용|입찰")
+_SKIP = re.compile(
+    r"결과|발표|합격|명단|수여식|증서|기부금|후기|수기|간담회|워크숍|연구|논문|채용|입찰"
+    r"|지급|납부|분할|서식|양식|변경사항|반환|환수|정정|연장 안내|만족도|설문"
+)
 
 _DATE_IN_ROW = re.compile(r"(20\d\d)\s*[.\-/]\s*(\d{1,2})\s*[.\-/]\s*(\d{1,2})")
 _DOWNLOAD = re.compile(r"download|file_?down|filedown|fileDown|down\.php|/file/down|atchFile|\.(?:hwp|hwpx|pdf|zip)\b", re.I)
 
 RECENT_DAYS = 150     # 이보다 오래된 글은 지난 회차라 보지 않는다
-MAX_POSTS = 6         # 게시판 하나에서 열어 보는 글 수
+MAX_POSTS = 8         # 게시판 하나에서 열어 보는 글 수
+CLOSED_KEEP_DAYS = 180  # 마감이 이보다 오래 지난 공고는 버린다 ('최근 마감' 탭과 같은 기간)
 MAX_FILES = 4         # 글 하나에서 받아 보는 첨부 수
 
 
+class BlockedURL(ValueError):
+    pass
+
+
+def check_public_url(url: str) -> None:
+    """사용자가 넣은 게시판 주소로 서버 안쪽(127.0.0.1, 사설망)을 찌르지 못하게 한다."""
+    parts = urllib.parse.urlsplit(url)
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        raise BlockedURL("http(s) 주소만 넣을 수 있습니다")
+    try:
+        infos = socket.getaddrinfo(parts.hostname, parts.port or (443 if parts.scheme == "https" else 80))
+    except socket.gaierror as exc:
+        raise BlockedURL(f"주소를 찾을 수 없습니다: {parts.hostname}") from exc
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0])
+        if not ip.is_global:
+            raise BlockedURL("내부망 주소는 넣을 수 없습니다")
+
+
+class _SafeRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D102
+        check_public_url(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 class Fetcher:
-    """쿠키를 기억하는 받기 도구. 글을 먼저 열어야 첨부가 받아지는 게시판(그누보드)이 있다."""
+    """쿠키를 기억하는 받기 도구. 글을 먼저 열어야 첨부가 받아지는 게시판(그누보드)이 있다.
+    공개 주소만 받는다 — 게시판은 사이트에서 사용자가 더할 수 있다."""
 
     def __init__(self, timeout: float = 25) -> None:
         self.timeout = timeout
-        self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+        self.opener = urllib.request.build_opener(
+            urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()), _SafeRedirect()
+        )
 
     def get(self, url: str, referer: str = "") -> tuple[bytes, str, str]:
         headers = {"User-Agent": _UA, "Accept-Language": "ko-KR,ko;q=0.9"}
@@ -91,6 +171,7 @@ class Fetcher:
             headers["Referer"] = referer
         # 한글이 섞인 주소('&gtxt=장학')는 그대로 보내면 urllib 가 못 보낸다
         url = urllib.parse.quote(url, safe=":/?&=%#+,;@!$'()*~[]")
+        check_public_url(url)
         req = urllib.request.Request(url, headers=headers)
         with self.opener.open(req, timeout=self.timeout) as resp:
             data = resp.read(docs.MAX_FILE_BYTES + 1)
@@ -182,12 +263,15 @@ def posted_in_page(text: str) -> dt.date | None:
 def clean_title(title: str) -> str:
     """'applying 2027년 … 선발 안내 신청기간 2026-10-14 ~ …' 처럼 목록 칸이 같이 붙은 제목을 다듬는다."""
     title = re.sub(r"^[a-z]+\s+", "", title.strip())
-    title = re.split(r"\s+(?:신청|접수|모집)기간\b", title)[0]
+    title = re.sub(r"^(?:공지|NOTICE|\d{1,6})\s+", "", title)  # 번호·공지 칸
+    title = re.split(r"\s+(?:신청|접수|모집)기간\b|\s+(?:NEW|UPDATED|new)\b|\s+20\d\d[.\-/]\d\d?[.\-/]\d\d?\b", title)[0]
     return title.strip()
 
 
-def wanted(title: str) -> bool:
-    return bool(_WANT.search(title) and _RECRUIT.search(title) and not _SKIP.search(title))
+def wanted(title: str, loose: bool = False) -> bool:
+    if not _WANT.search(title) or _SKIP.search(title):
+        return False
+    return loose or bool(_RECRUIT.search(title))
 
 
 def attachments(page: str, base_url: str) -> list[tuple[str, str]]:
@@ -263,24 +347,37 @@ def read_post(f: Fetcher, post: dict[str, Any]) -> dict[str, Any]:
     return {"start": start, "end": end, "where": where, "excerpt": _excerpt(text), "posted": ref}
 
 
+def pick(board: dict[str, Any], posts: list[dict[str, Any]], today: dt.date) -> list[dict[str, Any]]:
+    loose = bool(board.get("loose"))
+    return [
+        p for p in posts
+        if wanted(p["title"], loose)
+        and (p["posted"] is None and not loose or p["posted"] and (today - p["posted"]).days <= RECENT_DAYS)
+    ][:MAX_POSTS]
+
+
 def collect(boards: list[dict[str, Any]] | None = None, today: dt.date | None = None,
-            fetcher: Fetcher | None = None, log=None) -> list[dict[str, Any]]:
-    """게시판들을 돌며 최근 모집 공고를 장학금 항목 모양으로 돌려준다."""
+            fetcher: Fetcher | None = None, log=None,
+            stats: dict[str, dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+    """게시판들을 돌며 최근 모집 공고를 장학금 항목 모양으로 돌려준다.
+    stats 를 주면 게시판마다 {posts, picked, items, error} 를 채운다(화면에 보여 줄 것)."""
     today = today or dt.date.today()
     out: list[dict[str, Any]] = []
     for board in boards if boards is not None else BOARDS:
         f = fetcher or Fetcher()
+        stat = {"posts": 0, "picked": 0, "items": 0, "error": ""}
+        if stats is not None:
+            stats[board["id"]] = stat
         try:
             data, final_url, ctype = f.get(board["url"])
             posts = list_posts(decode_html(data, ctype), final_url)
         except Exception as exc:  # noqa: BLE001
+            stat["error"] = str(exc)[:200]
             if log:
                 log.warning("게시판 %s 목록을 못 읽음: %s", board["id"], exc)
             continue
-        picked = [
-            p for p in posts
-            if wanted(p["title"]) and (p["posted"] is None or (today - p["posted"]).days <= RECENT_DAYS)
-        ][:MAX_POSTS]
+        picked = pick(board, posts, today)
+        stat.update(posts=len(posts), picked=len(picked))
         for post in picked:
             try:
                 got = read_post(f, post)
@@ -293,12 +390,12 @@ def collect(boards: list[dict[str, Any]] | None = None, today: dt.date | None = 
                 continue  # 목록엔 날짜가 없었지만 글을 열어 보니 오래된 글
             start = got["start"] or posted
             end = got["end"]
-            if end and (today - end).days > 30:
-                continue  # 지난 회차
+            if end and (today - end).days > CLOSED_KEEP_DAYS:
+                continue  # 오래 지난 회차 ('최근 마감' 탭보다 오래된 것)
             if not end and (not posted or (today - posted).days > 60):
                 continue  # 마감일을 못 읽은 오래된 글은 살아 있는지 알 수 없다
             title = clean_title(post["title"])
-            org = _org_from_title(title, board["org"])
+            org = _org_from_title(title, board["org"]) if board.get("bracket_org") else board["org"]
             name = title
             start_s = start.isoformat() if start else ""
             out.append({
@@ -321,4 +418,5 @@ def collect(boards: list[dict[str, Any]] | None = None, today: dt.date | None = 
                 "posted": posted.isoformat() if posted else "",
                 "period_from": got["where"],
             })
+            stat["items"] += 1
     return out

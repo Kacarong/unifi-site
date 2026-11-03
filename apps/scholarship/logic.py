@@ -254,14 +254,31 @@ def merge(base: list[dict[str, Any]], extras: list[dict[str, Any]]) -> list[dict
     ids = {it["id"] for it in out}
     rounds = {(it["series"], it.get("end", "")) for it in out}
     by_org_end: dict[tuple[str, str], int] = {}
+    by_end: dict[str, list[int]] = {}
     for i, it in enumerate(out):
         by_org_end.setdefault((org_core(it.get("org", "")), it.get("end", "")), i)
+        by_end.setdefault(it.get("end", ""), []).append(i)
+
+    def same_notice(it: dict[str, Any]) -> int | None:
+        """학교 게시판이 다시 올린 외부 공고('부산지역인재 장학금 … 신청 공고') — 마감이 같고
+        제목에 원래 장학금 이름이나 기관명이 들어 있으면 같은 공고다."""
+        if not it.get("end"):
+            return None
+        hit = by_org_end.get((org_core(it.get("org", "")), it["end"]))
+        if hit is not None:
+            return hit
+        title = re.sub(r"\s+", "", it.get("notice_title", ""))
+        for i in by_end.get(it["end"], []):
+            name, org = re.sub(r"\s+", "", out[i].get("name", "")), org_core(out[i].get("org", ""))
+            if len(name) >= 5 and name in title or len(org) >= 4 and org in title:
+                return i
+        return None
     # 포털(구조화된 자료)을 게시판보다 먼저 — 같은 공고면 포털 쪽을 남긴다
     for it in sorted(extras, key=lambda x: bool(x.get("notice_title"))):
         if it["id"] in ids:
             continue
-        hit = by_org_end.get((org_core(it.get("org", "")), it.get("end", ""))) if it.get("end") else None
-        if hit is not None and it.get("notice_title"):
+        hit = same_notice(it) if it.get("notice_title") else None
+        if hit is not None:
             out[hit] = {**out[hit], "notice_url": it["url"], "notice_title": it["notice_title"],
                         "period_from": it.get("period_from", "")}
             continue
@@ -275,6 +292,7 @@ def merge(base: list[dict[str, Any]], extras: list[dict[str, Any]]) -> list[dict
         ids.add(it["id"])
         rounds.add((it["series"], it.get("end", "")))
         by_org_end.setdefault((org_core(it.get("org", "")), it.get("end", "")), len(out) - 1)
+        by_end.setdefault(it.get("end", ""), []).append(len(out) - 1)
     return out
 
 
@@ -296,15 +314,17 @@ def latest_rounds(items: Iterable[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     return latest
 
 
-def forecast(items: Iterable[dict[str, Any]], today: dt.date, horizon: int = 60) -> list[dict[str, Any]]:
-    """작년 일정으로 보면 앞으로 열릴 장학금(올해 회차는 아직 목록에 없는 것).
+def forecast(items: Iterable[dict[str, Any]], today: dt.date, horizon: int = 60,
+             lookback: int = 45) -> list[dict[str, Any]]:
+    """작년 일정으로 본 장학금(올해 회차는 아직 목록에 없는 것).
 
-    작년 기준으로 이미 모집이 시작됐을 것은 넣지 않는다. 원본에 올해 회차가
-    없다고 아직 안 열린 게 아니다 — 재단이 일정을 몇 주 당기거나(한국고등교육재단
-    인재림: 작년 10/28~11/24 → 올해 10/8~10/29), 학교 추천 마감이 재단보다
-    빠르거나(한국지도자육성장학재단: 학교 마감 10/26~10/30), 원본에 아예 안
-    올라오는 경우가 많아서, 이런 걸 넣으면 대부분 이미 끝난 것이 된다.
-    남은 것도 올해 모집이 확인된 것은 아니므로 화면에는 '작년 일정 참고' 로만 보여 준다.
+    두 갈래로 나눠 둔다. 둘 다 올해 모집이 확인된 것은 아니다.
+      - 앞으로 horizon 일 안에 시작할 것 (started=False)
+      - 작년 기준이면 최근 lookback 일 안에 이미 시작했을 것 (started=True)
+        재단이 일정을 당기거나(한국고등교육재단 인재림: 작년 10/28~11/24 → 올해
+        10/8~10/29) 학교 추천 마감이 먼저 지나는 경우가 많아 이미 끝났을 수 있다.
+        그래도 지우지 않고 '올해 공고 확인 필요' 로 보여 준다 — 원본에 안 올라왔을
+        뿐 아직 받는 곳도 있다.
     """
     out = []
     for it in latest_rounds(items).values():
@@ -314,11 +334,24 @@ def forecast(items: Iterable[dict[str, Any]], today: dt.date, horizon: int = 60)
         if (today - start).days < 300:
             continue  # 올해 회차가 이미 끝난 것 — 다음은 내년
         exp_start, exp_end = _plus_year(start), _plus_year(end)
-        if exp_start <= today or exp_start > today + dt.timedelta(days=horizon):
+        if exp_start <= today - dt.timedelta(days=lookback) or exp_start > today + dt.timedelta(days=horizon):
             continue
-        out.append({**it, "expected_start": exp_start.isoformat(), "expected_end": exp_end.isoformat()})
-    out.sort(key=lambda x: x["expected_start"])
-    return out
+        out.append({**it, "expected_start": exp_start.isoformat(), "expected_end": exp_end.isoformat(),
+                    "started": exp_start <= today})
+    # 앞으로 열릴 것을 먼저(빠른 순), 이미 시작했을 것은 뒤에(최근에 시작했을 것부터)
+    ahead = sorted((x for x in out if not x["started"]), key=lambda x: x["expected_start"])
+    behind = sorted((x for x in out if x["started"]), key=lambda x: x["expected_start"], reverse=True)
+    return ahead + behind
+
+
+def recently_closed(items: Iterable[dict[str, Any]], today: dt.date, days: int = 180) -> list[dict[str, Any]]:
+    """최근 마감된 회차 — 지난 공고도 남겨 두어 내년 일정을 가늠하게 한다(최근 마감 순)."""
+    rows = []
+    for it in items:
+        end = parse_date(it.get("end", ""))
+        if end and end < today and (today - end).days <= days and status(it, today) == "closed":
+            rows.append(it)
+    return sorted(rows, key=lambda it: it.get("end", ""), reverse=True)
 
 
 # ---------------- 알림 고르기 ----------------

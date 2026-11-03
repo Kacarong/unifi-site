@@ -161,8 +161,8 @@ def collect(known: set[tuple[str, str, str]], cache: dict[str, dict[str, Any]], 
                 continue
             seen.add(key)
             end = _date(r["end"])
-            if end and (today - end).days > 60:
-                continue  # 오래 지난 것은 굳이 상세를 받지 않는다
+            if end and (today - end).days > 180:
+                continue  # '최근 마감' 탭보다 오래 지난 것은 굳이 상세를 받지 않는다
             if key not in cache:
                 item = to_item(detail(r["code"]))
                 if not item:

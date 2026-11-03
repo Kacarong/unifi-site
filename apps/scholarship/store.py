@@ -61,6 +61,9 @@ def _blank() -> dict[str, Any]:
         "last_sync_at": 0.0,
         "last_extra_at": 0.0,  # 포털·게시판 확인
         "extra_error": "",
+        "sources_off": [],      # 끈 게시판 id
+        "custom_sources": [],   # 사용자가 더한 게시판 {id, label, url, loose}
+        "source_stats": {},     # 게시판 id → 마지막 확인 결과
         "last_check_at": 0.0,
         "last_error": "",    # 원본 갱신 실패
         "notify_error": "",  # 디스코드 전송 실패
@@ -184,6 +187,35 @@ def update_settings(patch: dict[str, Any]) -> dict[str, Any]:
         settings.update({k: v for k, v in patch.items() if k in DEFAULT_SETTINGS})
         _save()
         return dict(settings)
+
+
+# ---------------- 공고 게시판 출처 ----------------
+def add_source(src: dict[str, Any]) -> None:
+    with _lock:
+        custom = _load()["custom_sources"]
+        if not any(c["id"] == src["id"] for c in custom):
+            custom.append(src)
+        _save()
+
+
+def remove_source(source_id: str) -> bool:
+    with _lock:
+        state = _load()
+        before = len(state["custom_sources"])
+        state["custom_sources"] = [c for c in state["custom_sources"] if c["id"] != source_id]
+        state["source_stats"].pop(source_id, None)
+        _save()
+        return len(state["custom_sources"]) < before
+
+
+def set_source_on(source_id: str, on: bool) -> None:
+    with _lock:
+        off = _load()["sources_off"]
+        if on and source_id in off:
+            off.remove(source_id)
+        if not on and source_id not in off:
+            off.append(source_id)
+        _save()
 
 
 # ---------------- 관심 ----------------

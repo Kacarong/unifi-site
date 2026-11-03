@@ -73,6 +73,7 @@
           <button class="tab" data-view="open">신청 가능 <b></b></button>
           <button class="tab" data-view="year_round">연중 사업 <b></b></button>
           <button class="tab" data-view="soon">작년 일정 참고 <b></b></button>
+          <button class="tab" data-view="closed">최근 마감 <b></b></button>
           <button class="tab" data-view="starred">관심 <b></b></button>
           <button class="tab" data-view="all">전체 <b></b></button>
         </div>
@@ -85,6 +86,30 @@
         <div id="list" class="list"></div>
         <button id="more" class="btn more" hidden>더 보기</button>
       </section>
+
+      <details id="sourcesBox" class="panel reveal">
+        <summary><h2>공고 게시판 출처</h2><span id="sourcesSummary" class="tiny muted"></span></summary>
+        <p class="tiny muted hint">
+          한국장학재단 자료(월 1회 CSV + 실시간 포털)에 더해 아래 게시판을 6시간마다 읽습니다.
+          '장학' 글을 열어 본문에서 신청 기간을 읽고, 없으면 첨부 공고문(HWP·PDF·ZIP)을 내려받아 읽습니다.
+          학교·학과·재단 게시판의 <b>목록 화면 주소</b>를 붙여 넣으면 출처를 더할 수 있습니다
+          (게시판에서 '장학'으로 검색한 화면 주소면 더 좋습니다). 인스타그램·페이스북은 로그인이 필요해 읽을 수 없습니다.
+        </p>
+        <div id="sourceList" class="sources"></div>
+        <div class="field-grid form">
+          <label>게시판 주소
+            <input id="src_url" type="url" placeholder="https://…/board?…searchKeyword=장학" autocomplete="off" />
+          </label>
+          <label>이름 (선택)
+            <input id="src_label" type="text" placeholder="예: 부산대 사회기반시스템공학과" autocomplete="off" />
+          </label>
+        </div>
+        <div class="btns">
+          <button id="srcAdd" class="btn primary">출처 더하기</button>
+          <button id="srcRefresh" class="btn">지금 다시 모으기</button>
+        </div>
+        <p id="srcMsg" class="tiny"></p>
+      </details>
 
       <details id="notifyBox" class="panel reveal">
         <summary><h2>디스코드 알림</h2><span id="notifySummary" class="tiny muted"></span></summary>
@@ -115,9 +140,9 @@
       </details>
 
       <p class="tiny muted foot">
-        출처: <a id="sourceLink" href="https://www.data.go.kr/data/15028252/fileData.do" target="_blank" rel="noopener">공공데이터포털 · 한국장학재단 학자금지원정보(대학생)</a>.
-        한국장학재단이 한 달에 한 번 모아 올리는 자료라 막 올라온 공고는 늦게 들어올 수 있고,
-        대학 자체 장학금은 대부분 빠져 있습니다. 신청 전에 꼭 기관 공고 원문을 확인하세요.
+        출처: <a id="sourceLink" href="https://www.data.go.kr/data/15028252/fileData.do" target="_blank" rel="noopener">공공데이터포털 · 한국장학재단 학자금지원정보(대학생)</a>,
+        한국장학재단 학생지원 포털(실시간), 그리고 위 '공고 게시판 출처'.
+        자동으로 읽은 날짜는 틀릴 수 있으니 신청 전에 꼭 기관 공고 원문을 확인하세요.
         <button id="syncBtn" class="linkish">지금 원본 다시 받기</button>
       </p>
     </div>

@@ -130,6 +130,9 @@ def test_boards() -> None:
     check("목록 칸이 붙은 제목 다듬기",
           boards.clean_title("applying 2027년 두산연강 대학 장학생 선발 안내 신청기간 2026-10-14 ~ 2026-11-13"),
           "2027년 두산연강 대학 장학생 선발 안내")
+    check("목록 행 전체가 링크인 게시판의 제목 다듬기",
+          boards.clean_title("공지 2027년도 한국지도자육성장학재단 일반장학생 신청 안내 UPDATED 학생과 2026-10-16 1,193"),
+          "2027년도 한국지도자육성장학재단 일반장학생 신청 안내")
     check("글 화면의 작성일", boards.posted_in_page("작성일 25-12-26 11:39"), D("2025-12-26"))
     files = boards.attachments(POST_PAGE, "https://www.ksce.or.kr/not/default.asp")
     check("첨부는 공고문을 먼저, 신청서 양식은 뒤로", [n for _, n in files],
@@ -141,7 +144,7 @@ def test_boards() -> None:
         "bidx=40000": "<p>작성일 2025-03-02</p><p>접수기간 2025.3.2 ~ 2025.3.20</p>".encode(),
         "gbn=10": LIST_PAGE.encode(),
     })
-    board = {"id": "ksce_news", "label": "대한토목학회 토목계소식", "org": "대한토목학회",
+    board = {"id": "ksce_news", "label": "대한토목학회 토목계소식", "org": "대한토목학회", "bracket_org": True,
              "url": "https://www.ksce.or.kr/not/default.asp?gbn=10"}
     got = boards.collect([board], today=TODAY, fetcher=fetcher)
     check("최근 모집 글 하나만", [(g["org"], g["start"], g["end"]) for g in got],
@@ -149,6 +152,19 @@ def test_boards() -> None:
     check("일정을 어디서 읽었는지 남김", got[0]["period_from"], "첨부 [공고문] 제2기 장학생 선발.hwpx")
     check("지원 내용 줄을 뽑아 생활비 판정에 씀", logic.purpose(got[0]), "living")
     check("오래된 글은 열어 보지도 않음", any("bidx=40000" in u for u in fetcher.asked), False)
+
+    school = {"id": "school", "loose": True}
+    school_posts = [
+        {"title": "2026학년도 부경 더채움 장학금", "posted": D("2026-10-11"), "url": "a"},
+        {"title": "2026-2학기 국가장학금Ⅰ유형 장학금 지급 안내(2차)", "posted": D("2026-10-26"), "url": "b"},
+        {"title": "「부경 더채움 장학금」서식 변경사항 안내", "posted": D("2026-10-07"), "url": "c"},
+        {"title": "맞춤형 장학검색", "posted": None, "url": "d"},  # 메뉴 링크
+    ]
+    check("학교 게시판은 '모집' 낱말 없어도 받되, 지급·서식 안내와 날짜 없는 메뉴는 뺌",
+          [p["url"] for p in boards.pick(school, school_posts, TODAY)], ["a"])
+    stats: dict = {}
+    boards.collect([{**board, "id": "bad", "url": "http://127.0.0.1:8090/"}], today=TODAY, stats=stats)
+    check("내부망 주소는 받지 않고 실패 원인을 남김", stats["bad"]["error"], "내부망 주소는 넣을 수 없습니다")
 
 
 DETAIL_PAGE = """
@@ -238,6 +254,13 @@ def test_merge() -> None:
     eng = [x for x in out if logic.org_core(x["org"]) == "엔지니어링인재육성재단"]
     check("같은 기관·같은 마감이면 한 번만, 원래 항목에 원문 주소를 붙임",
           (len(eng), eng[0].get("notice_url"), eng[0].get("period_from")), (1, same_notice["url"], "첨부 공고문.pdf"))
+    school_repost = {**item("부경대학교", "2026년 부산지역인재 장학금 하반기 생활장학금 지원 신청 공고", "2026-10-14", "2026-10-28"),
+                     "notice_title": "2026년 부산지역인재 장학금 하반기 생활장학금 지원 신청 공고<~10. 28.>",
+                     "url": "https://www.pknu.ac.kr/main/163?action=view&no=1", "source": "부경대 등록·장학 공지"}
+    busan = item("부산광역시청", "부산지역인재 장학금", "2026-10-14", "2026-10-28")
+    out2 = logic.merge([busan], [school_repost])
+    check("학교가 다시 올린 외부 공고는 원래 장학금에 원문 링크로만 붙음",
+          (len(out2), out2[0].get("notice_url")), (1, school_repost["url"]))
     check("두산 새 회차 덕분에 '작년 일정 참고' 에서 빠짐",
           [f["org"] for f in logic.forecast(out, D("2026-10-01"))], [])
 

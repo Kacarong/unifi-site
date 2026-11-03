@@ -7,7 +7,8 @@ const state = { view: 'open', offset: 0, options: null, profile: null, seq: 0 };
 const VIEW_HINT = {
   open: '지금 신청할 수 있는 장학금입니다. 마감이 가까운 순서. 학교 추천을 거치는 장학금은 학교 마감이 더 빠를 수 있습니다.',
   year_round: '공고 기간이 1년 가까이 잡힌 사업입니다. 국가근로·멘토링 장학금처럼 실제 신청은 학기마다 짧게 따로 받는 경우가 많아서, 지금 신청할 수 있는지는 기관 공고에서 꼭 확인하세요.',
-  soon: '작년엔 지금부터 두 달 안에 모집을 시작했는데, 올해 공고는 아직 목록에 없는 장학금입니다. 올해 모집은 확인되지 않았습니다. 일정이 당겨져 이미 끝났을 수도 있고, 학교 추천을 거치는 장학금은 학교 마감이 더 빠르니 기관·학교 공지에서 꼭 확인하세요. ☆ 해 두면 올해 모집이 목록에 올라올 때 알려 드립니다.',
+  soon: '작년 일정으로 본 장학금인데 올해 공고는 아직 목록에 없습니다. 위쪽은 작년엔 두 달 안에 시작했던 것, 아래쪽(\'확인 필요\')은 작년 기준이면 이미 모집을 시작했을 것입니다. 일정이 당겨져 이미 끝났을 수도, 아직 받고 있을 수도 있으니 기관·학교 공지에서 꼭 확인하세요. ☆ 해 두면 올해 모집이 목록에 올라올 때 알려 드립니다.',
+  closed: '최근 6개월 안에 마감된 회차입니다. 지난 공고도 지우지 않고 남겨 둡니다 — 내년 일정을 가늠하거나 놓친 장학금의 다음 모집을 ☆ 해 둘 때 쓰세요.',
   starred: '관심 표시한 장학금입니다. 내 조건과 상관없이 늘 보입니다.',
   all: '받아 둔 장학금 전부입니다(지난 회차 포함). 최근에 모집한 순서.',
 };
@@ -108,6 +109,9 @@ async function saveProfile() {
 
 // ---------------- 목록 ----------------
 function statusBadge(it) {
+  if (it.expected_start && it.started) {
+    return el('span', 'badge warn', `작년 ${md(it.start)}~${md(it.end)} 모집 · 작년 기준이면 이미 시작 · 올해 공고 확인 필요`);
+  }
   if (it.expected_start) {
     return el('span', 'badge warn', `작년 ${md(it.start)}~${md(it.end)} 모집 · 올해 모집 미확인`);
   }
@@ -395,6 +399,90 @@ async function loadOptions() {
   state.options = o;
 }
 
+// ---------------- 공고 게시판 출처 ----------------
+function sourceStat(st) {
+  if (!st) return '아직 안 읽음';
+  if (st.error) return `⚠️ 못 읽음: ${st.error}`;
+  return `글 ${st.posts}개 · 장학 글 ${st.picked}개 열어 봄 · 목록에 ${st.items}건`;
+}
+
+function renderSources(list) {
+  const box = $('sourceList');
+  box.textContent = '';
+  for (const src of list) {
+    const row = el('div', 'source');
+    const lab = el('label', 'check');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = src.enabled;
+    cb.addEventListener('change', async () => {
+      try {
+        renderSources((await api(`/sources/${src.id}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: cb.checked }),
+        })).sources);
+        $('srcMsg').textContent = '바꿨습니다. "지금 다시 모으기"를 누르면 목록에 바로 반영됩니다.';
+      } catch (e) { cb.checked = !cb.checked; alert(e.message); }
+    });
+    const a = el('a', null, src.label);
+    a.href = src.url; a.target = '_blank'; a.rel = 'noopener';
+    lab.append(cb, ' ', a);
+    row.append(lab, el('span', 'tiny muted', ' ' + sourceStat(src.stat)));
+    if (!src.builtin) {
+      const del = el('button', 'linkish', '지우기');
+      del.addEventListener('click', async () => {
+        if (!confirm(`'${src.label}' 출처를 지울까요?`)) return;
+        try { renderSources((await api(`/sources/${src.id}`, { method: 'DELETE' })).sources); } catch (e) { alert(e.message); }
+      });
+      row.append(' ', del);
+    }
+    box.append(row);
+  }
+  $('sourcesSummary').textContent = `켜진 게시판 ${list.filter((s) => s.enabled).length}곳`;
+}
+
+async function loadSources() {
+  renderSources((await api('/sources')).sources);
+}
+
+async function addSource() {
+  const url = $('src_url').value.trim();
+  if (!url) { $('srcMsg').textContent = '게시판 주소를 넣어 주세요.'; return; }
+  const btn = $('srcAdd');
+  btn.disabled = true;
+  $('srcMsg').textContent = '게시판을 읽어 보는 중…';
+  try {
+    const r = await api('/sources', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, label: $('src_label').value.trim() }),
+    });
+    renderSources(r.sources);
+    const sample = r.probe.scholarship.length ? ` 예: ${r.probe.scholarship.slice(0, 3).join(' / ')}` : ' 최근 장학 글은 아직 없습니다.';
+    $('srcMsg').textContent = `더했습니다. 글 ${r.probe.posts}개를 찾았습니다.${sample} "지금 다시 모으기"를 누르면 바로 반영됩니다.`;
+    $('src_url').value = ''; $('src_label').value = '';
+  } catch (e) {
+    $('srcMsg').textContent = '더하지 못했습니다: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function refreshSources() {
+  const btn = $('srcRefresh');
+  btn.disabled = true;
+  $('srcMsg').textContent = '포털과 게시판을 다시 읽는 중… (1분쯤 걸립니다)';
+  try {
+    const r = await api('/sources/refresh', { method: 'POST' });
+    renderSources(r.sources);
+    $('srcMsg').textContent = `다시 모았습니다. 포털 ${r.portal}건, 게시판 ${r.boards}건.` + (r.errors?.length ? ` ⚠️ ${r.errors.join(' / ')}` : '');
+    loadStatus();
+    reload();
+  } catch (e) {
+    $('srcMsg').textContent = '다시 모으지 못했습니다: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 // ---------------- 시작 ----------------
 function bind() {
   for (const tab of document.querySelectorAll('.tab')) {
@@ -409,6 +497,8 @@ function bind() {
   $('notifySave').addEventListener('click', saveSettings);
   $('notifyTest').addEventListener('click', testNotify);
   $('syncBtn').addEventListener('click', forceSync);
+  $('srcAdd').addEventListener('click', addSource);
+  $('srcRefresh').addEventListener('click', refreshSources);
 }
 
 (async function init() {
@@ -421,5 +511,6 @@ function bind() {
     $('status').textContent = '불러오지 못했습니다: ' + e.message;
   }
   loadSettings().catch(() => {});
+  loadSources().catch(() => {});
   reload();
 })();

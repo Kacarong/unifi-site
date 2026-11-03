@@ -138,3 +138,7 @@ label.check { font-size: 13.5px; }
   cursor: pointer;
 }
 .more[hidden] { display: none; }
+
+.sources { display: grid; gap: 6px; margin: 10px 0 14px; }
+.source { font-size: 13.5px; line-height: 1.5; }
+.source a { color: inherit; }

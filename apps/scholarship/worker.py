@@ -71,7 +71,9 @@ def sync_extra(today: dt.date | None = None) -> dict[str, Any]:
         portal = [it for it in prev_extra if it.get("source") == "한국장학재단 포털"]
 
     try:
-        notices = boards.collect(today=today, log=log)
+        stats: dict[str, dict[str, Any]] = {}
+        notices = boards.collect(boards.active_sources(store.snapshot()), today=today, log=log, stats=stats)
+        store.update({"source_stats": {k: {**v, "at": time.time()} for k, v in stats.items()}})
     except Exception as exc:  # noqa: BLE001 - 게시판 쪽 예외로 포털 결과까지 잃지 않는다
         errors.append(f"공고 게시판: {exc}")
         notices = [it for it in prev_extra if it.get("notice_title") and it.get("source") != "한국장학재단 포털"]
