@@ -19,6 +19,7 @@
 | 🎬 `exvideo` | 강의 영상 → 전사·슬라이드 OCR·그림 추출, 그리고 전사 + 강의자료 PDF → 요약정리본 PDF | FastAPI + GPU 파이프라인 |
 | 🎟️ `cgvmacro` | CGV 취소표·상영오픈 감시와 디스코드 알림 | 서버 감시 + 로컬 PC 선점 에이전트 |
 | 🎓 `scholarship` | 대학생 장학금 모음 + 관심 장학금 마감·다음 모집 디스코드 알림 | 서버 백그라운드 (추가 설치 없음) |
+| 🎖️ `wargame` | 2026·1980년 시작 국가 전략 게임 (실제 세계지도·실존 무기) | 프론트엔드 전용, 소스는 별도 저장소에서 빌드해 `~/wargame-site` 에 배포 (`WARGAME_DIST` 로 변경) |
 
 원본 레포: [geoglobe](https://github.com/Kacarong/geoglobe) ·
 [ex-video](https://github.com/Kacarong/ex-video) ·
