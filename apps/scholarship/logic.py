@@ -8,7 +8,6 @@
 from __future__ import annotations
 
 import datetime as dt
-import difflib
 import re
 from typing import Any, Iterable
 
@@ -339,27 +338,36 @@ def merge(base: list[dict[str, Any]], extras: list[dict[str, Any]]) -> list[dict
     return out
 
 
-# 이름에서 장학금을 가르지 못하는 낱말 — 드림스폰은 '○○재단 장학 (2027년)', CSV 는 '장학생' 처럼 적는다
-_GENERIC_NAME = re.compile(r"\([^)]*\)|\d+\s*(?:년도?|학년도|학기|차)|장학금|장학생|장학|모집|선발|공고|안내|신규|대학생|하반기|상반기|\s+")
+# 괄호 안이 연도·학기·회차·마감뿐일 때만 지운다 — '(2027년)', '(2026년 2학기)', '(2차)', '(~11.12.)'.
+# '(키움증권)', '(유형1)' 처럼 장학금을 가르는 괄호는 남긴다.
+_DATE_PAREN = re.compile(r"\((?:\s*(?:\d+\s*(?:년도?|학년도|학기|차)|[~.\d\s]+|하반기|상반기)\s*)+\)")
+# 장학금을 가르지 못하는 낱말 — 드림스폰은 '○○재단 장학 (2027년)', CSV 는 '장학생' 처럼 적는다.
+# 지원 용도(생활비·등록금)나 고유명은 지우지 않는다.
+_GENERIC_NAME = re.compile(
+    r"\d+\s*(?:년도?|학년도|학기|차)|장학금|장학생|장학|모집|선발|공고|안내|신규|대학생|하반기|상반기"
+    r"|도내|시내|군내|구내|관내|[()\[\]·,\s]+"
+)
+_ORG_SUFFIX = re.compile(r"(?:인재육성재단|장학재단|장학회|장학관|교육재단|재단|학회|협회|진흥원|공제조합)$")
 
 
 def _name_core(name: str, org: str) -> str:
-    name = re.sub(r"\s+", "", name or "")
-    for o in {re.sub(r"\s+", "", org or ""), org_core(org)}:
+    """이름에서 기관명·연도·'장학' 같은 낱말을 뺀 나머지. 기관명은 '경상남도장학회' 와 앞부분
+    '경상남도' 둘 다 뺀다('경상남도 대학 해외 교환장학생' ↔ '도내 대학 해외교환 장학생')."""
+    name = _DATE_PAREN.sub("", re.sub(r"\s+", "", name or ""))
+    core = org_core(org)
+    stem = _ORG_SUFFIX.sub("", core)  # '한국장학재단' → '한국' 처럼 너무 짧은 앞부분은 쓰지 않는다
+    for o in sorted({re.sub(r"\s+", "", org or ""), core, stem if len(stem) >= 3 else ""}, key=len, reverse=True):
         if len(o) >= 2:
             name = name.replace(o, "")
     return _GENERIC_NAME.sub("", name)
 
 
 def _names_match(a: str, a_org: str, b: str, b_org: str) -> bool:
-    """같은 기관의 두 이름이 같은 장학금을 가리킬 수 있나: 한쪽이 기관명·'장학' 같은 낱말뿐이거나,
-    둘이 짧은 쪽의 절반 이상(4자 이상) 이어서 겹치거나('도내 대학 해외교환 장학생' ↔ '경상남도 대학 해외
-    교환장학생 모집'). 'A 장학' 과 'B 장학', '푸른등대 키움증권' 과 '푸른등대 한국가스공사' 는 다른 장학금."""
+    """같은 기관의 두 이름이 같은 장학금인가. 한쪽 이름이 기관명·'장학' 같은 낱말뿐이거나, 한쪽이
+    다른 쪽에 통째로 들어 있을 때만 같다고 본다. 양쪽에 서로 다른 말이 남으면(생활비↔등록금,
+    키움증권↔한국가스공사) 다른 장학금 — 애매하면 둘 다 남긴다."""
     ca, cb = _name_core(a, a_org), _name_core(b, b_org)
-    if not ca or not cb:
-        return True
-    m = difflib.SequenceMatcher(None, ca, cb, autojunk=False).find_longest_match(0, len(ca), 0, len(cb))
-    return m.size >= min(len(ca), len(cb)) or m.size >= max(4, (min(len(ca), len(cb)) + 1) // 2)
+    return not ca or not cb or ca in cb or cb in ca
 
 
 def _same_scholarship(agg: dict[str, Any], other: dict[str, Any]) -> bool:
@@ -371,7 +379,7 @@ def _same_scholarship(agg: dict[str, Any], other: dict[str, Any]) -> bool:
     title = other.get("notice_title") or other.get("name", "")
     if org_core(agg.get("org", "")) == org_core(other.get("org", "")):
         return _names_match(agg.get("name", ""), agg.get("org", ""), title, other.get("org", ""))
-    core = re.sub(r"\([^)]*\)|\s+", "", agg.get("name", ""))
+    core = _DATE_PAREN.sub("", re.sub(r"\s+", "", agg.get("name", "")))
     return len(core) >= 5 and core in re.sub(r"\s+", "", title)
 
 
