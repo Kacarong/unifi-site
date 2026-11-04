@@ -6,7 +6,7 @@
   - 신청 기간을 '결과 발표' 날짜와 헷갈리지 않는지, 연도가 빠지거나 틀린 날짜를 바로잡는지
   - 게시일을 모를 때 작년 공고를 올해 공고로 둔갑시키지 않는지
   - 본문에 날짜가 없으면 첨부 공고문(HWPX/ZIP)에서 읽는지
-  - 같은 장학금이 CSV·포털·게시판에 겹쳐 있을 때 한 번만 보이는지
+  - 같은 장학금이 CSV·포털·게시판·드림스폰에 겹쳐 있을 때 한 번만 보이는지
 """
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 os.environ.setdefault("UNIFI_DATA_DIR", tempfile.mkdtemp(prefix="unifi-test-"))
 
-from apps.scholarship import boards, docs, kosaf, logic  # noqa: E402
+from apps.scholarship import boards, docs, dreamspon, kosaf, logic  # noqa: E402
 
 FAILURES: list[str] = []
 D = dt.date.fromisoformat
@@ -265,6 +265,75 @@ def test_merge() -> None:
           [f["org"] for f in logic.forecast(out, D("2026-10-01"))], [])
 
 
+def _ds_row(idx: str, name: str, org: str, tags: list[str]) -> str:
+    spans = "".join(f"<span>#{t}</span>" for t in tags)
+    return (f'<tr class=""><td class="td_subject"><p class="title"><a href="/scholarship/view.html?idx={idx}">{name}</a></p>'
+            f'<div class="hashtag">{spans}</div></td><td>{org}</td><td class="td_day">D-2</td><td class="hit">1</td></tr>')
+
+
+DS_DETAIL = (
+    '<dl class="scholarship04"><dt style=\'display:none;\'></dt><dd>'
+    '<p><span><strong>• 신청기간</strong></span></p><p><b>2026. 10. 19. ~ 2026. 11. 06. </b></p><br><br>'
+    '<p><span><strong>• 선발인원</strong></span></p><p><b>총 2명</b></p><br><br>'
+    '<p><span><strong>• 장학혜택</strong></span></p><p><b>[장학금지급] 최대 200 만원 (생"></dd></dl>'
+)
+
+
+def test_dreamspon() -> None:
+    print("드림스폰")
+    page = ("<table><tbody>"
+            + _ds_row("9264", "신주장학재단 대학생 생활비 장학", "신주장학재단", ["장학금", "대학생", "추천서"])
+            + _ds_row("9263", "양평군장학회 학자금대출 이자지원", "양평군장학회", ["대출지원", "대학생"])
+            + _ds_row("8853", "의왕시 청년 이사비지원", "의왕시", ["기타지원", "청년", "지역기준"])
+            + _ds_row("5134", "첫번째 장학금 받는 꿀팁1", "드림스폰", [])
+            + _ds_row("9271", "서귀포시 남원읍 인재양성 꿈 장학 (2026년)", "서귀포시 남원읍", ["장학금", "중학생"])
+            + "</tbody></table>")
+    rows = dreamspon.parse_list(page)
+    check("목록 행", (rows[0]["idx"], rows[0]["name"], rows[0]["org"], rows[0]["tags"]),
+          ("9264", "신주장학재단 대학생 생활비 장학", "신주장학재단", ["장학금", "대학생", "추천서"]))
+    check("장학 글만 (이사비·꿀팁 빼고)",
+          [r["idx"] for r in rows if dreamspon.wanted(r)], ["9264", "9263", "9271"])
+    det = dreamspon.parse_detail(DS_DETAIL)
+    check("글 요약 칸 (잘린 혜택 꼬리는 떼어 냄)", det,
+          {"start": "2026-10-19", "end": "2026-11-06", "quota": "총 2명", "benefit": "[장학금지급] 최대 200 만원"})
+
+    details = {"9264": det, "9263": det, "9271": {**det, "end": "2026-11-01"}}
+    got = dreamspon.collect(TODAY, list_page=lambda no: page if no == 1 else "", detail=lambda idx: details[idx])
+    check("마감 지난 글은 뺌", [g["url"].rsplit("=", 1)[1] for g in got], ["9264", "9263"])
+    shinju, loan = got
+    try:
+        dreamspon.collect(TODAY, list_page=lambda no: "<html>바뀐 화면</html>", detail=lambda idx: det)
+        check("목록 형식이 바뀌면 오류로 남김", "조용히 0건", "오류")
+    except dreamspon.DreamsponError:
+        check("목록 형식이 바뀌면 오류로 남김", "오류", "오류")
+    profile = {"regions": "부산", "purpose": "living", "exclude_loans": True}
+    check("이름에 생활비 → 생활비 장학금, 지역 무관", (logic.purpose(shinju), logic.matches(profile, shinju)), ("living", True))
+    check("대출이자 지원은 대출로 빠짐", logic.is_loan(loan), True)
+    remote = dreamspon.to_item(rows[4], det)
+    check("기관·이름에 지명이 있으면 그 지역 장학금", logic.region_verdict(profile, remote), "no")
+
+    base = [item("재단법인 신주장학재단", "대학생 장학금", "2025-10-01", "2025-10-31"),
+            item("(재)두산연강재단", "장학생", "2026-10-14", "2026-11-13")]
+    board = {**item("대한환경공학회", "에코니티 장학 공고", "2026-10-19", "2026-11-20"),
+             "notice_title": "에코니티 장학 공고", "source_id": "x", "source": "게시판"}
+    ds = lambda org, name, end: {**dreamspon.to_item({"idx": name, "name": name, "org": org, "tags": ["장학금"]},
+                                                      {**det, "end": end})}
+    out = logic.merge(base, [ds("두산연강재단", "두산연강재단 장학 (2027년)", "2026-11-13"),
+                             ds("대한환경공학회", "에코니티·대한환경공학회 우수학생 장학", "2026-11-20"),
+                             ds("신주장학재단", "신주장학재단 대학생 생활비 장학", "2026-11-06"),
+                             board])
+    check("CSV·게시판에 같은 기관·마감이 있으면 드림스폰 것은 버림",
+          sorted(x.get("source", "csv") for x in out), ["csv", "csv", "게시판", "드림스폰"])
+    new = [x for x in out if x.get("source") == "드림스폰"][0]
+    check("기관의 장학금이 하나면 그 장학금의 새 회차로(☆ 이어짐)", new["series"], base[0]["series"])
+    school = {**item("부경대학교", "2026년 2학기 푸른등대 기부장학금(2차) 신규장학생 선발 안내(~11.12.)", "2026-10-22", "2026-11-12"),
+              "notice_title": "2026년 2학기 푸른등대 기부장학금(2차) 신규장학생 선발 안내(~11.12.)", "source_id": "pknu_main",
+              "school_board": True, "source": "부경대 등록·장학 공지"}
+    out2 = logic.merge([], [school, ds("한국장학재단", "푸른등대 기부장학금 (2026년 2학기)", "2026-11-12")])
+    check("학교가 다시 올린 같은 공고(이름·마감 같음)가 있으면 드림스폰 것은 버림", [x["source"] for x in out2],
+          ["부경대 등록·장학 공지"])
+
+
 def test_review_regressions() -> None:
     print("학교 게시판 공고끼리 합치지 않기 · 못 본 공고 남기기 · 일정 미확인")
     from apps.scholarship import worker
@@ -329,6 +398,7 @@ def main() -> int:
     test_boards()
     test_kosaf()
     test_merge()
+    test_dreamspon()
     test_review_regressions()
     if FAILURES:
         print(f"\n실패 {len(FAILURES)}건")

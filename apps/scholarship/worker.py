@@ -2,7 +2,7 @@
 
 한 시간마다 한 번 깬다.
   - 원본(공공데이터포털)은 6시간마다 파일 번호만 확인하고 바뀌었을 때만 받는다.
-  - 한국장학재단 실시간 포털과 공고 게시판(대한토목학회·재단)은 6시간마다 본다.
+  - 한국장학재단 실시간 포털, 드림스폰, 공고 게시판(대한토목학회·재단)은 6시간마다 본다.
     CSV 는 한 달에 한 번이라, 그 사이에 올라온 공고를 여기서 채운다.
   - 알림은 깨어날 때마다 고르되, 밤(22시~8시)에는 보내지 않고 아침까지 미룬다.
 """
@@ -18,7 +18,7 @@ import urllib.request
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from . import boards, kosaf, logic, source, store
+from . import boards, dreamspon, kosaf, logic, source, store
 
 log = logging.getLogger("unifi.scholarship")
 
@@ -71,13 +71,14 @@ def keep_previous(prev: list[dict[str, Any]], fresh: list[dict[str, Any]], today
 
 
 def sync_extra(today: dt.date | None = None) -> dict[str, Any]:
-    """CSV 에 아직 없는 장학금을 포털·게시판에서 모은다. 한쪽이 실패해도 다른 쪽은 남긴다."""
+    """CSV 에 아직 없는 장학금을 포털·드림스폰·게시판에서 모은다. 한쪽이 실패해도 다른 쪽은 남긴다."""
     today = today or now_kst().date()
     base = store.base_items()
     known = {(it["org"], it["name"], it.get("end", "")) for it in base}
     errors: list[str] = []
     prev = store.extra_items()
-    prev_portal = [it for it in prev if not it.get("notice_title")]
+    prev_dream = [it for it in prev if it.get("aggregator")]
+    prev_portal = [it for it in prev if not it.get("notice_title") and not it.get("aggregator")]
     prev_notices = [it for it in prev if it.get("notice_title")]
 
     cache = store.kosaf_cache()
@@ -90,6 +91,13 @@ def sync_extra(today: dt.date | None = None) -> dict[str, Any]:
     except source.SourceError as exc:
         errors.append(str(exc))
     portal = keep_previous(prev_portal, portal, today)
+
+    dream: list[dict[str, Any]] = []
+    try:
+        dream = dreamspon.collect(today, log=log)
+    except dreamspon.DreamsponError as exc:
+        errors.append(str(exc))
+    dream = keep_previous(prev_dream, dream, today)
 
     state = store.snapshot()
     active = boards.active_sources(state)
@@ -109,10 +117,10 @@ def sync_extra(today: dt.date | None = None) -> dict[str, Any]:
         errors.append(f"공고 게시판: {exc}")
     notices = keep_previous(prev_notices, notices, today, from_active)
 
-    store.replace_extras(portal + notices)
+    store.replace_extras(portal + dream + notices)
     store.update({"last_extra_at": time.time(), "extra_error": " / ".join(errors)})
-    log.info("추가 출처: 포털 %d건, 게시판 %d건", len(portal), len(notices))
-    return {"portal": len(portal), "boards": len(notices), "errors": errors}
+    log.info("추가 출처: 포털 %d건, 드림스폰 %d건, 게시판 %d건", len(portal), len(dream), len(notices))
+    return {"portal": len(portal), "dreamspon": len(dream), "boards": len(notices), "errors": errors}
 
 
 # ---------------- 디스코드 ----------------
@@ -208,7 +216,7 @@ def build_message(note: dict[str, Any], settings: dict[str, Any], site_url: str,
     embed: dict[str, Any] = {"title": title, "description": desc[:4000], "color": color}
     if site_url:
         embed["url"] = site_url.rstrip("/") + "/apps/scholarship/"
-    embed["footer"] = {"text": "출처: 한국장학재단 학자금지원정보·포털, 대한토목학회·재단 공고 · 자격은 공고 원문으로 꼭 확인하세요"}
+    embed["footer"] = {"text": "출처: 한국장학재단 학자금지원정보·포털, 드림스폰, 대한토목학회·재단 공고 · 자격은 공고 원문으로 꼭 확인하세요"}
 
     payload: dict[str, Any] = {"embeds": [embed]}
     mention = _mention(settings.get("discord_mention", ""))

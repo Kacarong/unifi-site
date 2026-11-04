@@ -53,7 +53,7 @@ async function loadStatus() {
     let text = s.count
       ? `${basis} · 장학금 ${s.count.toLocaleString()}건 · 지금 신청 가능 ${s.open}건 · 마지막 확인 ${fmtTs(s.last_sync_at)}`
       : '아직 원본을 받지 못했습니다. 잠시 뒤 새로고침하거나 아래 "지금 원본 다시 받기"를 눌러 주세요.';
-    if (s.extra_count) text += ` · 포털·공고 게시판에서 더 찾은 것 ${s.extra_count}건 (${fmtTs(s.last_extra_at)})`;
+    if (s.extra_count) text += ` · 포털·드림스폰·공고 게시판에서 더 찾은 것 ${s.extra_count}건 (${fmtTs(s.last_extra_at)})`;
     if (s.last_error) text += ` · ⚠️ 갱신 실패: ${s.last_error}`;
     if (s.extra_error) text += ` · ⚠️ 추가 출처 실패: ${s.extra_error}`;
     if (s.notify_error) text += ` · ⚠️ 알림 실패: ${s.notify_error}`;
@@ -482,11 +482,11 @@ async function addSource() {
 async function refreshSources() {
   const btn = $('srcRefresh');
   btn.disabled = true;
-  $('srcMsg').textContent = '포털과 게시판을 다시 읽는 중… (1분쯤 걸립니다)';
+  $('srcMsg').textContent = '포털·드림스폰·게시판을 다시 읽는 중… (1분쯤 걸립니다)';
   try {
     const r = await api('/sources/refresh', { method: 'POST' });
     renderSources(r.sources);
-    $('srcMsg').textContent = `다시 모았습니다. 포털 ${r.portal}건, 게시판 ${r.boards}건.` + (r.errors?.length ? ` ⚠️ ${r.errors.join(' / ')}` : '');
+    $('srcMsg').textContent = `다시 모았습니다. 포털 ${r.portal}건, 드림스폰 ${r.dreamspon}건, 게시판 ${r.boards}건.` + (r.errors?.length ? ` ⚠️ ${r.errors.join(' / ')}` : '');
     loadStatus();
     reload();
   } catch (e) {

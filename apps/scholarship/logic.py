@@ -248,6 +248,7 @@ def merge(base: list[dict[str, Any]], extras: list[dict[str, Any]]) -> list[dict
     """CSV 목록에 포털·게시판에서 모은 것을 더한다. 이미 있는 장학금은 다시 넣지 않는다.
 
     - 같은 회차(id)거나, 같은 장학금(series)에 마감일이 같으면 이미 있는 것.
+    - 드림스폰(aggregator)은 마감일이 같고 기관이나 이름이 같은 것이 이미 있으면(CSV·포털·게시판 어디든) 버린다.
     - 게시판 공고는 이름이 공고 제목이다. 그 기관의 장학금이 하나뿐이면 그 장학금의 새 회차로 붙인다.
       기관이 같고 마감일까지 같으면 같은 공고로 보고, 원래 항목에 공고 원문 주소만 붙인다.
     """
@@ -298,8 +299,27 @@ def merge(base: list[dict[str, Any]], extras: list[dict[str, Any]]) -> list[dict
             if org != mine and len(org) >= 4 and org in title:
                 return i
         return None
-    # 포털(구조화된 자료)을 게시판보다 먼저 — 같은 공고면 포털 쪽을 남긴다
-    for it in sorted(extras, key=lambda x: bool(x.get("notice_title"))):
+    # 포털(구조화된 자료)을 게시판보다 먼저 — 같은 공고면 포털 쪽을 남긴다.
+    # 드림스폰처럼 남의 공고를 옮겨 적은 곳(aggregator)은 맨 끝에, 아무 데도 없는 것만 더한다.
+    for it in sorted(extras, key=lambda x: (bool(x.get("aggregator")), bool(x.get("notice_title")))):
+        if it.get("aggregator"):
+            mine = org_core(it.get("org", ""))
+            # 학교가 다시 올린 공고는 기관이 학교라서 이름으로도 본다('푸른등대 기부장학금 (2026년 2학기)'
+            # ↔ '2026년 2학기 푸른등대 기부장학금(2차) 신규장학생 선발 안내')
+            core = re.sub(r"\([^)]*\)|\s+", "", it.get("name", ""))
+            if any(o.get("end", "") == it.get("end", "") and (
+                    org_core(o.get("org", "")) == mine
+                    or len(core) >= 5 and core in re.sub(r"\s+", "", o.get("notice_title") or o.get("name", "")))
+                   for o in out):
+                continue
+            same_org = series_of.get(mine, set())
+            if len(same_org) == 1:  # 그 기관의 장학금이 하나면 그 장학금의 새 회차로(☆ 가 이어진다)
+                series, name = next(iter(same_org))
+                it = {**it, "series": series, "name": name}
+            if (it["series"], it.get("end", "")) not in rounds:
+                out.append(it)
+                rounds.add((it["series"], it.get("end", "")))
+            continue
         if it["id"] in ids:
             continue
         hit = same_notice(it) if it.get("notice_title") else None
