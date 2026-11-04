@@ -297,12 +297,26 @@ def test_dreamspon() -> None:
     check("글 요약 칸 (잘린 혜택 꼬리는 떼어 냄)", det,
           {"start": "2026-10-19", "end": "2026-11-06", "quota": "총 2명", "benefit": "[장학금지급] 최대 200 만원"})
 
-    details = {"9264": det, "9263": det, "9271": {**det, "end": "2026-11-01"}}
-    got = dreamspon.collect(TODAY, list_page=lambda no: page if no == 1 else "", detail=lambda idx: details[idx])
-    check("마감 지난 글은 뺌", [g["url"].rsplit("=", 1)[1] for g in got], ["9264", "9263"])
-    shinju, loan = got
+    grad_page = "<table>" + _ds_row("9266", "한국여성재단 실천여성학 펠로우십 장학", "한국여성재단", ["장학금", "대학원생"]) + "</table>"
+    details = {"9264": det, "9263": det, "9271": {**det, "end": "2026-11-01"}, "9266": det, "9999": det}
+    # '대학생' 검색에는 서귀포(초·중) 글이 안 걸린다고 치고, 목록에 #초등학생 #중학생 만 보여도 실제로는
+    # 대학생을 뽑는 글(9999)은 '대학생' 검색에 걸리므로 받는다
+    hidden = "<table>" + _ds_row("9999", "고창군장학재단 장학 (2026년)", "고창군장학재단", ["장학금", "초등학생", "중학생"]) + "</table>"
+    pages = {("대학생", 1): page.replace(_ds_row("9271", "서귀포시 남원읍 인재양성 꿈 장학 (2026년)", "서귀포시 남원읍",
+                                                 ["장학금", "중학생"]), "") + hidden,
+             ("대학원생", 1): grad_page}
+    got = dreamspon.collect(TODAY, list_page=lambda lv, no: pages.get((lv, no), ""), detail=lambda idx: details[idx])
+    check("대학생·대학원생 검색에 걸린 장학 글만", [g["url"].rsplit("=", 1)[1] for g in got], ["9264", "9263", "9999", "9266"])
+    shinju, loan, gochang, grad = got
+    check("목록 태그가 잘려 #중학생 만 보여도 대학생 검색에 걸리면 대학 재학생 조건 통과",
+          logic.matches({"level": "재학생"}, gochang), True)
+    check("대학원생에만 걸린 글은 대학 재학생 조건에서 빠지고 대학원 조건엔 맞음",
+          (logic.matches({"level": "재학생"}, grad), logic.matches({"level": "대학원"}, grad)), (False, True))
+    got2 = dreamspon.collect(TODAY, list_page=lambda lv, no: page if (lv, no) == ("대학생", 1) else "",
+                             detail=lambda idx: details[idx])
+    check("마감 지난 글은 뺌", [g["url"].rsplit("=", 1)[1] for g in got2], ["9264", "9263"])
     try:
-        dreamspon.collect(TODAY, list_page=lambda no: "<html>바뀐 화면</html>", detail=lambda idx: det)
+        dreamspon.collect(TODAY, list_page=lambda lv, no: "<html>바뀐 화면</html>", detail=lambda idx: det)
         check("목록 형식이 바뀌면 오류로 남김", "조용히 0건", "오류")
     except dreamspon.DreamsponError:
         check("목록 형식이 바뀌면 오류로 남김", "오류", "오류")
@@ -326,6 +340,22 @@ def test_dreamspon() -> None:
           sorted(x.get("source", "csv") for x in out), ["csv", "csv", "게시판", "드림스폰"])
     new = [x for x in out if x.get("source") == "드림스폰"][0]
     check("기관의 장학금이 하나면 그 장학금의 새 회차로(☆ 이어짐)", new["series"], base[0]["series"])
+    check("새 회차로 붙여도 드림스폰 이름을 지켜 '생활비' 조건이 그대로 맞음",
+          (new["name"], logic.matches(profile, new)), ("신주장학재단 대학생 생활비 장학", True))
+    notes = logic.plan_notifications(out, profile=profile, settings={"notify_new": True}, stars=[],
+                                     known_ids={x["id"] for x in base}, sent=set(), today=TODAY)
+    check("병합 결과에서 신주 장학금이 '새 장학금' 알림 대상", [(n["kind"], [i["name"] for i in n["items"]]) for n in notes],
+          [("new", ["신주장학재단 대학생 생활비 장학"])])
+    two = logic.merge([item("가나재단", "A 장학금", "2026-10-01", "2026-11-20")],
+                      [ds("가나재단", "가나재단 B 장학", "2026-11-20"), ds("가나재단", "가나재단 A 장학 (2026년)", "2026-11-20")])
+    check("같은 기관·같은 마감이라도 이름이 다르면 둘 다 남김(같은 이름은 버림)", sorted(x["name"] for x in two),
+          ["A 장학금", "가나재단 B 장학"])
+    gn = logic.merge([item("경상남도장학회", "도내 대학 해외교환 장학생", "2026-04-06", "2026-12-18"),
+                      item("(재)한국장학재단", "푸른등대 키움증권 기부장학금", "2026-10-22", "2026-11-12")],
+                     [ds("경상남도장학회", "경상남도 대학 해외 교환장학생 모집", "2026-12-18"),
+                      ds("한국장학재단", "푸른등대 한국가스공사 기부장학금", "2026-11-12")])
+    check("적는 방식만 다른 같은 이름은 버리고, 앞부분만 같은 다른 장학금은 남김",
+          [x["name"] for x in gn if x.get("source") == "드림스폰"], ["푸른등대 한국가스공사 기부장학금"])
     school = {**item("부경대학교", "2026년 2학기 푸른등대 기부장학금(2차) 신규장학생 선발 안내(~11.12.)", "2026-10-22", "2026-11-12"),
               "notice_title": "2026년 2학기 푸른등대 기부장학금(2차) 신규장학생 선발 안내(~11.12.)", "source_id": "pknu_main",
               "school_board": True, "source": "부경대 등록·장학 공지"}

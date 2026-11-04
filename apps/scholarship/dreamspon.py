@@ -5,11 +5,15 @@
 로그인 없이 보이고, 자격·원문 링크는 로그인해야 보인다. 그래서 여기서 받는 것은
 기관·이름·신청기간·혜택 요약까지이고, 링크는 드림스폰 글로 건다.
 
-  목록  /scholarship/list.html?ordby=1&page=N  (모집중, 쪽당 15건)
+  목록  /scholarship/list.html?ordby=1&sch_type=keyword&sch_key=대학생&page=N  (모집중, 쪽당 15건)
   글    /scholarship/view.html?idx=N
 
+대상(대학생·대학원생·중학생…)은 글마다 해시태그로 붙어 있는데 목록에는 앞의 3개만 보인다
+('#장학금 #초등학생 #중학생' 인 글이 실제로는 대학생도 뽑는다). 그래서 키워드 검색으로
+'대학생'·'대학원생' 태그가 붙은 모집중 글만 받고, 대학원생에만 걸린 글은 대학원 전용으로 둔다.
+
 광고·후기·대출이자·이사비 같은 장학금 아닌 글이 섞여 있어서 '장학'이 들어간 것만 받는다.
-한국장학재단 자료와 겹치는 것은 logic.merge 가 기관·마감일로 걸러 낸다.
+한국장학재단 자료와 겹치는 것은 logic.merge 가 기관·마감일·이름으로 걸러 낸다.
 """
 from __future__ import annotations
 
@@ -17,6 +21,7 @@ import datetime as dt
 import hashlib
 import html
 import re
+import urllib.parse
 import urllib.request
 from typing import Any, Callable
 
@@ -24,11 +29,13 @@ from . import regions
 
 SOURCE = "드림스폰"
 BASE = "https://www.dreamspon.com"
-LIST_URL = BASE + "/scholarship/list.html?ordby=1&page={}"
+LIST_URL = BASE + "/scholarship/list.html?ordby=1&sch_type=keyword&sch_key={}&page={}"
 VIEW_URL = BASE + "/scholarship/view.html?idx={}"
 _UA = {"User-Agent": "Mozilla/5.0 (unifi-site scholarship)"}
 
 MAX_PAGES = 10  # 모집중은 보통 3쪽 안팎
+LEVELS = ("대학생", "대학원생")  # 이 태그가 붙은 글만 받는다
+GRAD_ONLY = ["석사신입생(1학기)", "석사2학기이상", "박사과정"]  # source.GRADE_VOCAB 의 대학원 낱말
 
 _SKIP_NAME = re.compile(r"꿀팁|인터뷰|MOU|후기|합격자\s*발표|할인")
 
@@ -111,7 +118,8 @@ def _key(*parts: str) -> str:
     return hashlib.sha1("|".join(p.strip() for p in parts).encode("utf-8")).hexdigest()[:12]
 
 
-def to_item(row: dict[str, Any], det: dict[str, str]) -> dict[str, Any]:
+def to_item(row: dict[str, Any], det: dict[str, str], levels: set[str] | frozenset[str] = frozenset({"대학생"})) -> dict[str, Any]:
+    """levels: 이 글이 걸린 대상 검색('대학생'·'대학원생')."""
     org, name, tags = row["org"], row["name"], row["tags"]
     # 지역: '#지역기준' 이 붙었거나 기관·이름에 지명이 있으면 지역 장학금으로 본다.
     # 지명을 못 찾은 지역 장학금은 '지역 확인 필요' 로 남는다(logic.place).
@@ -129,7 +137,7 @@ def to_item(row: dict[str, Any], det: dict[str, str]) -> dict[str, Any]:
         "category": "지역연고" if regional else "",
         "region": f"{org} {name}" if regional else "",
         "schools": [],
-        "grades": [],
+        "grades": GRAD_ONLY if "대학생" not in levels else [],
         "fields": [],
         "url": VIEW_URL.format(row["idx"]),
         "start": det["start"],
@@ -140,38 +148,42 @@ def to_item(row: dict[str, Any], det: dict[str, str]) -> dict[str, Any]:
     }
 
 
-def fetch_list(no: int) -> str:
-    return _get(LIST_URL.format(no))
+def fetch_list(level: str, no: int) -> str:
+    return _get(LIST_URL.format(urllib.parse.quote(level), no))
 
 
 def fetch_detail(idx: str) -> dict[str, str]:
     return parse_detail(_get(VIEW_URL.format(idx)))
 
 
-def collect(today: dt.date, list_page: Callable[[int], str] = fetch_list,
+def collect(today: dt.date, list_page: Callable[[str, int], str] = fetch_list,
             detail: Callable[[str], dict[str, str]] = fetch_detail, log=None) -> list[dict[str, Any]]:
-    """모집중 장학금. 신청기간을 못 읽은 글은 넣지 않는다(지금 받는지 알 수 없다)."""
+    """대학생·대학원생 대상 모집중 장학금. 신청기간을 못 읽은 글은 넣지 않는다(지금 받는지 알 수 없다)."""
+    rows: dict[str, dict[str, Any]] = {}
+    levels: dict[str, set[str]] = {}
+    for level in LEVELS:
+        for no in range(1, MAX_PAGES + 1):
+            page = list_page(level, no)
+            got = parse_list(page)
+            if level == LEVELS[0] and no == 1 and not got:  # 대학생 모집중이 0건일 리는 없다
+                raise DreamsponError("드림스폰 목록을 읽지 못했습니다 (화면 형식이 바뀐 것 같습니다)")
+            for row in got:
+                rows.setdefault(row["idx"], row)
+                levels.setdefault(row["idx"], set()).add(level)
+            if not got or not has_next(page, no):
+                break
     out: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for no in range(1, MAX_PAGES + 1):
-        page = list_page(no)
-        rows = parse_list(page)
-        if no == 1 and not rows:
-            raise DreamsponError("드림스폰 목록을 읽지 못했습니다 (화면 형식이 바뀐 것 같습니다)")
-        for row in rows:
-            if row["idx"] in seen or not wanted(row):
-                continue
-            seen.add(row["idx"])
-            try:
-                det = detail(row["idx"])
-            except DreamsponError as exc:
-                if log:
-                    log.warning("드림스폰 글 %s 를 못 읽음: %s", row["idx"], exc)
-                continue
-            end = dt.date.fromisoformat(det["end"]) if det["end"] else None
-            if not end or end < today:
-                continue
-            out.append(to_item(row, det))
-        if not rows or not has_next(page, no):
-            break
+    for idx, row in rows.items():
+        if not wanted(row):
+            continue
+        try:
+            det = detail(idx)
+        except DreamsponError as exc:
+            if log:
+                log.warning("드림스폰 글 %s 를 못 읽음: %s", idx, exc)
+            continue
+        end = dt.date.fromisoformat(det["end"]) if det["end"] else None
+        if not end or end < today:
+            continue
+        out.append(to_item(row, det, levels[idx]))
     return out
