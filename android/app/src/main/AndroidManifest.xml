@@ -7,6 +7,7 @@
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:manageSpaceActivity="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Translucent.NoTitleBar">
 
@@ -58,6 +59,16 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="${siteHost}" />
             </intent-filter>
+        </activity>
+
+        <!-- 설정 > 앱 > 저장공간 '데이터 관리'에서 사이트 데이터를 지우는 화면.
+             TWA 실행 때 라이브러리가 이 화면의 존재를 확인하므로 없으면 앱이 바로 죽는다. -->
+        <activity
+            android:name="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity"
+            android:exported="false">
+            <meta-data
+                android:name="android.support.customtabs.trusted.MANAGE_SPACE_URL"
+                android:value="${siteUrl}" />
         </activity>
 
         <activity
