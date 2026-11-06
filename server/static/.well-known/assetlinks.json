@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "kr.kacarong.unifi",
+      "sha256_cert_fingerprints": [
+        "EC:8C:A5:45:3D:AC:2F:5C:FF:24:98:F5:FB:78:D8:3D:12:EE:D0:C9:40:41:90:4A:9C:14:08:ED:CC:BD:93:09"
+      ]
+    }
+  }
+]

@@ -34,6 +34,8 @@ PUBLIC_PATHS = {
     "/icon-180.png",
     "/icon-192.png",
     "/icon-512.png",
+    # 안드로이드 앱(TWA)이 이 사이트의 주인임을 확인하는 파일. 로그인 전에 열려야 한다.
+    "/.well-known/assetlinks.json",
 }
 # 로컬 PC 에이전트는 쿠키가 없다. 대신 X-Agent-Token 으로 인증한다
 # (공개 모드에서는 해당 토큰 설정이 필수 — apps/cgvmacro/api.py 참고).

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- server/static/icon.svg 의 육각형·원 (배경 사각형은 adaptive icon 배경색이 대신한다) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.140625"
+        android:scaleY="0.140625"
+        android:translateX="18"
+        android:translateY="18">
+        <path
+            android:pathData="M256,104 L390,182 L390,330 L256,408 L122,330 L122,182 Z"
+            android:strokeWidth="30"
+            android:strokeLineJoin="round">
+            <aapt:attr name="android:strokeColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="122" android:startY="104"
+                    android:endX="390" android:endY="408">
+                    <item android:offset="0" android:color="#FF6C8CFF" />
+                    <item android:offset="0.55" android:color="#FF34D8C8" />
+                    <item android:offset="1" android:color="#FFB06CFF" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <path android:pathData="M210,256 a46,46 0 1,0 92,0 a46,46 0 1,0 -92,0 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="210" android:startY="210"
+                    android:endX="302" android:endY="302">
+                    <item android:offset="0" android:color="#FF6C8CFF" />
+                    <item android:offset="0.55" android:color="#FF34D8C8" />
+                    <item android:offset="1" android:color="#FFB06CFF" />
+                </gradient>
+            </aapt:attr>
+        </path>
+    </group>
+</vector>

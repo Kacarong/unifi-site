@@ -1,0 +1,7 @@
+.gradle/
+build/
+local.properties
+# 서명 정보 — 절대 커밋하지 않는다 (README 의 '서명' 참고)
+keystore.properties
+*.jks
+*.keystore
