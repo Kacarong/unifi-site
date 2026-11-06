@@ -127,6 +127,8 @@ def test_boards() -> None:
     check("주소의 '&gtxt=' 를 '>xt=' 로 망가뜨리지 않음", "&gtxt=장학&gbn=10&bgbn=R" in posts[1]["url"], True)
     check("목록의 날짜를 게시일로", posts[1]["posted"], D("2026-10-27"))
     check("결과 발표 글은 빼기", boards.wanted("2026 장학생 선발 결과 발표"), False)
+    check("'신청과 관련하여' 처럼 모집 낱말 없이 신청 기간을 알리는 글도 받기",
+          boards.wanted("제30기 (2026년 하반기) 대학생 장학금 신청과 관련하여"), True)
     check("목록 칸이 붙은 제목 다듬기",
           boards.clean_title("applying 2027년 두산연강 대학 장학생 선발 안내 신청기간 2026-10-14 ~ 2026-11-13"),
           "2027년 두산연강 대학 장학생 선발 안내")

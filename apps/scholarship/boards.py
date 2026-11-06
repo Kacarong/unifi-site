@@ -83,6 +83,12 @@ BOARDS: list[dict[str, Any]] = [
         "org": "재단법인 우양",
         "url": "https://www.wooyang.org/News",
     },
+    {
+        "id": "inseok",
+        "label": "인석장학회",
+        "org": "인석장학회",
+        "url": "https://www.inseok.org/board5/bbs/board.php?bo_table=notice_1",
+    },
 ]
 
 def all_sources(state: dict[str, Any]) -> list[dict[str, Any]]:
@@ -115,7 +121,7 @@ def probe(url: str, today: dt.date | None = None) -> dict[str, Any]:
 
 # 제목 고르기
 _WANT = re.compile(r"장학")
-_RECRUIT = re.compile(r"모집|선발|공고|공모|추천")
+_RECRUIT = re.compile(r"모집|선발|공고|공모|추천|신청")
 _SKIP = re.compile(
     r"결과|발표|합격|명단|수여식|증서|기부금|후기|수기|간담회|워크숍|연구|논문|채용|입찰"
     r"|지급|납부|분할|서식|양식|변경사항|반환|환수|정정|연장 안내|만족도|설문"
