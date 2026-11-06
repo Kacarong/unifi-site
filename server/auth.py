@@ -25,6 +25,7 @@ PUBLIC_PATHS = {
     "/api/_login",
     "/api/_health",
     "/ui.css",
+    "/appshell.css",   # ui.css 가 불러온다. 로그인 화면에서도 같은 전환·터치 느낌을 쓴다
     "/ui.js",
     "/style.css",
     "/fonts.css",
