@@ -65,7 +65,8 @@ label.check { display:flex; gap:.4rem; align-items:flex-start; } label.check.inl
 .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap:0 1rem; } .grid2 .full, .grid2 h2 { grid-column: 1 / -1; }
 .actions { display:flex; flex-wrap:wrap; gap:.4rem; align-items:center; }
 .actions form { margin:0; }
-.actions.sticky { position:sticky; bottom:0; background:linear-gradient(0deg, var(--bg) 70%, transparent); padding:.7rem 0; }
+/* 휴대폰 하단 탭바(/appshell.css) 위에 붙는다. 탭바가 없으면 --dock-space 가 없어 맨 아래 */
+.actions.sticky { position:sticky; bottom:var(--dock-space, 0px); background:linear-gradient(0deg, var(--bg) 70%, transparent); padding:.7rem 0; }
 .inline-form { display:flex; flex-wrap:wrap; gap:.4rem; margin-bottom:.5rem; } .inline-form input { flex:1 1 280px; }
 .notice { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:.65rem .85rem; margin-bottom:.5rem; }
 .notice.excluded { background:rgba(255,107,127,.05); border-color:rgba(255,107,127,.3); }

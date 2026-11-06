@@ -16,6 +16,7 @@ def _router_factory():
 SPEC = AppSpec(
     id="cgvmacro",
     name="CGV 좌석 감시",
+    short_name="CGV",
     tagline="취소표·상영 오픈 감시 + 디스코드 알림",
     accent="#ff4a54",
     # 좌석 선점은 로컬 PC 의 크롬을 조작해야 해서 휴대폰에서는 의미가 없다.

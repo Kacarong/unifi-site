@@ -12,6 +12,9 @@
  * 실제로 쓰인 글자가 든 조각만 내려받는다. */
 @import url("/fonts.css");
 
+/* 화면 전환·하단 탭바·터치 느낌 (앱처럼 보이게 하는 부분) */
+@import url("/appshell.css");
+
 /* ───────────────────────── 1. 토큰 ───────────────────────── */
 :root {
   --bg: #070b16;
@@ -532,22 +535,7 @@ label:has(> input[type="checkbox"]) {
 
 .reveal.in { opacity: 1; transform: none; }
 
-/* 페이지 전환 — 지원하는 브라우저에서만 켜진다.
- * 포털 카드와 앱 화면 머리말에 같은 view-transition-name 을 달아 두면,
- * 카드를 누를 때 그 카드가 다음 화면 자리로 이어지듯 움직인다. */
-@view-transition { navigation: auto; }
-
-::view-transition-old(root) { animation: fade-out 180ms var(--smooth) both; }
-::view-transition-new(root) { animation: rise-in 320ms var(--spring) both; }
-
-/* 이어지는 요소는 크기/위치를 부드럽게 맞춘다 */
-::view-transition-group(*) {
-  animation-duration: 380ms;
-  animation-timing-function: var(--spring);
-}
-
-@keyframes fade-out { to { opacity: 0; } }
-@keyframes rise-in { from { opacity: 0; transform: translateY(10px); } }
+/* 페이지 전환은 /appshell.css 에 있다 */
 
 /* ─────────────── 7. 접근성 / 저사양 대응 ─────────────── */
 :focus-visible {

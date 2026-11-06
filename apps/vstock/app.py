@@ -32,6 +32,7 @@ def _mount(app):
 SPEC = AppSpec(
     id="vstock",
     name="가상 주식",
+    short_name="주식",
     tagline="실제 시세로 해 보는 주식·코인 모의투자",
     accent="#a78bfa",
     icon="📈",

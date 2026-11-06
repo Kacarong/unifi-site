@@ -33,6 +33,7 @@ def _mount(app) -> None:
 SPEC = AppSpec(
     id="housing",
     name="임대·분양 공고 알림",
+    short_name="공고",
     tagline="LH·SH·GH·청약홈 공고 모음 + 조건 맞는 새 공고 알림",
     accent="#38bdf8",
     icon="🏠",

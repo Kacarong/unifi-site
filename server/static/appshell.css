@@ -1,0 +1,134 @@
+/* unifi 앱 셸 스타일 — `/appshell.css`
+ *
+ * 화면 전환, 하단 탭바, 터치 느낌. `/ui.css` 가 이 파일을 불러오므로 ui.css 를
+ * 쓰는 화면은 따로 넣을 필요가 없다. ui.css 를 안 쓰는 화면(공고 알림 등)은
+ * 이 파일만 따로 링크한다. 그래서 토큰을 빌려 쓰지 않고 값을 직접 적는다.
+ */
+
+/* ── 터치 느낌 ───────────────────────────────────────────── */
+html {
+  -webkit-tap-highlight-color: transparent;   /* 누를 때 생기는 파란 네모 */
+  overscroll-behavior-y: none;                /* 화면 끝에서 튕기거나 당겨 새로고침 */
+}
+
+/* 버튼·탭·카드 머리를 길게 누르면 글자가 선택되고 메뉴가 뜨는데, 앱에서는
+ * 그런 일이 없다. 본문 글(공고 내용, 장학금 설명 등)은 그대로 복사할 수 있다. */
+button, .btn, .button, .back, .chip, .badge, .card-head, .topbar, header.top nav,
+.dock, label:has(> input[type="checkbox"]) {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* ── 화면 전환 ───────────────────────────────────────────
+ * 지원하는 브라우저(안드로이드 Chrome 등)에서만 켜진다. 들어갈 때는 새 화면이
+ * 오른쪽에서, 뒤로 갈 때는 왼쪽에서 살짝 밀려 들어온다. 방향은 appshell.js 가
+ * 정한다. 포털 카드와 앱 머리말처럼 같은 view-transition-name 이 붙은 요소는
+ * 그 자리로 이어지듯 움직인다. */
+@view-transition { navigation: auto; }
+
+::view-transition-old(root) {
+  animation: vt-out 200ms cubic-bezier(0.4, 0, 1, 1) both;
+  --vt-dx: -36px;
+}
+::view-transition-new(root) {
+  animation: vt-in 320ms cubic-bezier(0, 0, 0.2, 1) 60ms both;
+  --vt-dx: 36px;
+}
+html:active-view-transition-type(back)::view-transition-old(root) { --vt-dx: 36px; }
+html:active-view-transition-type(back)::view-transition-new(root) { --vt-dx: -36px; }
+
+@keyframes vt-out { to { opacity: 0; transform: translateX(var(--vt-dx)); } }
+@keyframes vt-in { from { opacity: 0; transform: translateX(var(--vt-dx)); } }
+
+/* 이어지는 요소는 크기·위치를 부드럽게 맞춘다 */
+::view-transition-group(*) {
+  animation-duration: 380ms;
+  animation-timing-function: cubic-bezier(0.22, 1.2, 0.36, 1);
+}
+
+/* 탭바는 화면이 바뀌어도 제자리에 있어야 앱처럼 보인다 */
+.dock { view-transition-name: unifi-dock; }
+::view-transition-group(unifi-dock) { animation-duration: 0s; }
+
+/* ── 하단 탭바 ───────────────────────────────────────────
+ * 휴대폰처럼 좁은 화면에서만 보인다. PC 에서는 위쪽 링크로 충분하다. */
+.dock { display: none; }
+
+@media (max-width: 760px) {
+  /* --dock-space: 탭바가 덮는 높이. 화면 아래에 붙는 요소는 이만큼 띄운다 */
+  html.has-dock { --dock-h: 60px; --dock-space: calc(var(--dock-h) + env(safe-area-inset-bottom, 0px)); }
+  html.has-dock body { padding-bottom: var(--dock-space); }
+
+  .dock {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    display: flex;
+    justify-content: space-around;
+    gap: 2px;
+    padding: 4px max(6px, env(safe-area-inset-left, 0px)) env(safe-area-inset-bottom, 0px)
+      max(6px, env(safe-area-inset-right, 0px));
+    background: linear-gradient(0deg, rgba(7, 11, 22, 0.94), rgba(7, 11, 22, 0.78));
+    backdrop-filter: blur(16px) saturate(150%);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    border-top: 1px solid rgba(120, 140, 200, 0.16);
+    /* 앱이 늘어나 칸이 모자라면 옆으로 밀어서 본다 */
+    overflow-x: auto;
+    scrollbar-width: none;
+    transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .dock::-webkit-scrollbar { display: none; }
+
+  /* 입력 중에는 키보드 위에 얹혀 가리지 않게 내려 둔다 */
+  html.typing .dock { transform: translateY(110%); }
+
+  .dock-tab {
+    flex: 1 0 52px;
+    max-width: 96px;
+    min-height: var(--dock-h);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 4px 2px;
+    border-radius: 14px;
+    color: #8b97bb;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.2;
+    text-decoration: none !important;
+    touch-action: manipulation;
+    transition: color 140ms, background 140ms, transform 140ms cubic-bezier(0.22, 1.2, 0.36, 1);
+  }
+  .dock-tab:active { transform: scale(0.92); background: rgba(255, 255, 255, 0.06); }
+  .dock-tab[aria-current="page"] { color: #e9edfa; }
+
+  .dock-icon {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 28px;
+    border-radius: 999px;
+    font-size: 18px;
+    line-height: 1;
+    transition: background 200ms;
+  }
+  .dock-tab[aria-current="page"] .dock-icon { background: rgba(108, 140, 255, 0.24); }
+
+  .dock-label {
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+}
+
+/* 모션을 꺼 달라고 한 사용자에게는 화면 전환도 끈다 */
+@media (prefers-reduced-motion: reduce) {
+  @view-transition { navigation: none; }
+  .dock, .dock-tab { transition: none; }
+}

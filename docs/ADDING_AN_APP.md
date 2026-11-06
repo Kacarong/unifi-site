@@ -116,14 +116,24 @@ SPEC = AppSpec(id="mysite", name="내 사이트", mount=_mount)
 
 ## 화면 — 공용 디자인 시스템 물려받기
 
-셸이 `/ui.css` 와 `/ui.js` 를 서빙합니다. 앱 HTML 의 `<head>` 에 두 줄만 넣으면
-사이트 전체와 같은 톤·모션·모바일 대응을 그대로 받습니다. 빌드 단계는 필요 없습니다.
+셸이 `/ui.css`, `/ui.js`, `/appshell.js` 를 서빙합니다. 앱 HTML 의 `<head>` 에 아래
+줄만 넣으면 사이트 전체와 같은 톤·모션·모바일 대응을 그대로 받습니다. 빌드 단계는 필요 없습니다.
 
 ```html
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <link rel="stylesheet" href="/ui.css" />
+<script src="/appshell.js"></script>
 <script src="/ui.js" defer></script>
 ```
+
+`/appshell.js` 는 앱처럼 느껴지게 하는 부분입니다. 화면 사이를 밀리듯 넘기는 전환,
+누를 만한 화면 미리 불러오기, 휴대폰에서 보이는 하단 탭바를 붙입니다. 화면 전환 방향을
+첫 화면이 그려지기 전에 정해야 하므로 `defer` 없이 `<head>` 에 둡니다. 탭바에는
+`SPEC` 의 `short_name`(두세 글자)이 쓰이고, 비우면 `name` 이 그대로 들어갑니다.
+
+`/ui.css` 를 쓰지 않는 화면(서버 렌더링 앱 등)은 `<link rel="stylesheet" href="/appshell.css" />`
+를 따로 넣습니다. 화면 아래에 붙는 요소가 있으면 `bottom: var(--dock-space, 0px)` 로
+탭바 위에 띄우세요.
 
 쓸 수 있는 조각들:
 

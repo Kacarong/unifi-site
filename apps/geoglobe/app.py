@@ -8,6 +8,7 @@ from server.registry import AppSpec, BuildSpec
 SPEC = AppSpec(
     id="geoglobe",
     name="지오글로브",
+    short_name="지구본",
     tagline="지구본으로 지리 익히고 퀴즈로 복습",
     accent="#22c9a0",
     icon="🌍",

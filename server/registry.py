@@ -32,6 +32,8 @@ class BuildSpec:
 class AppSpec:
     id: str
     name: str
+    # 하단 탭바처럼 좁은 자리에 쓰는 짧은 이름 (두세 글자). 비우면 name 을 쓴다.
+    short_name: str = ""
     # 카드 겉면에 보이는 한 줄. 비우면 description 의 첫 문장을 쓴다.
     tagline: str = ""
     # 카드를 펼쳤을 때 나오는 자세한 설명
@@ -96,6 +98,7 @@ class AppSpec:
         return {
             "id": self.id,
             "name": self.name,
+            "short_name": self.short_name or self.name,
             "tagline": self.card_tagline,
             "description": self.description,
             "icon": self.icon,

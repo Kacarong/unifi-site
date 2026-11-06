@@ -17,6 +17,7 @@ def _router_factory():
 SPEC = AppSpec(
     id="scholarship",
     name="장학금 알리미",
+    short_name="장학금",
     tagline="내 조건에 맞는 대학생 장학금 모음 + 마감 알림",
     accent="#22c55e",
     icon="🎓",

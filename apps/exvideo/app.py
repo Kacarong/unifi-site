@@ -16,6 +16,7 @@ def _router_factory():
 SPEC = AppSpec(
     id="exvideo",
     name="ex-video",
+    short_name="강의영상",
     tagline="강의 영상 → 전사·슬라이드·그림 한 번에",
     accent="#4f8dff",
     icon="🎬",

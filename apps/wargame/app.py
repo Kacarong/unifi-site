@@ -16,6 +16,7 @@ from server.registry import AppSpec
 SPEC = AppSpec(
     id="wargame",
     name="현대전 전략 시뮬레이션",
+    short_name="전략게임",
     tagline="실제 세계지도 위에서 나라 하나를 맡아 운영하는 전략 게임",
     accent="#c8a24a",
     icon="🎖️",

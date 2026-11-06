@@ -173,6 +173,7 @@ DESKTOP_ONLY_PAGE = """<!doctype html><html lang="ko"><head>
 <meta name="theme-color" content="#070b16" /><meta name="color-scheme" content="dark" />
 <title>{name} · PC 전용</title>
 <link rel="stylesheet" href="/ui.css" />
+<script src="/appshell.js"></script>
 <style>
   .only {{ min-height: 100dvh; display: grid; place-items: center; padding: 24px; }}
   .only .panel {{ max-width: 380px; text-align: center; display: grid; gap: 14px; }}
