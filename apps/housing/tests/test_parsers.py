@@ -129,3 +129,10 @@ def test_lh_api_housing_only_region_and_paging():
     assert by_id["P1"].sidos == ["부산"]
     assert by_id["P3"].sidos == ["인천"]  # '전국' → 지역본부로 판정
     assert by_id["P200"].raw["mi"] == "1027"
+
+
+def test_lh_maintenance_page():
+    html = fixture_text("lh_maintenance.html")  # 2026-11-07 LH 점검 때 받은 응답
+    assert lh.parse_list(html, "1026") == []
+    assert lh.is_maintenance_page(html)
+    assert not lh.is_maintenance_page(fixture_text("lh_list_rent.html"))

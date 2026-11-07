@@ -26,6 +26,15 @@ PAGE_SIZE = 50
 _HQ_RE = re.compile(r"\[([가-힣]+)지역본부\]")
 
 
+class LHMaintenance(RuntimeError):
+    pass
+
+
+def is_maintenance_page(html: str) -> bool:
+    """LH는 점검 중 모든 주소에 '한국토지주택공사 임시페이지'(점검 안내 이미지 한 장)를 200으로 돌려준다."""
+    return "임시페이지" in html[:2000]
+
+
 def hq_sidos(title: str) -> list[str]:
     """제목의 LH 지역본부 표기를 시도로. '[인천지역본부]' -> ['인천'], '[부산울산지역본부]' -> ['부산', '울산']."""
     m = _HQ_RE.search(title)
@@ -196,6 +205,8 @@ class LHCollector(Collector):
                     html = client.post_html(LIST_URL, data={**form, "currPage": str(page)})
                 page_items = parse_list(html, mi)
                 if page == 1 and not page_items:
+                    if is_maintenance_page(html):
+                        raise LHMaintenance("LH 사이트 점검 중(점검 안내 임시페이지만 응답)")
                     raise ValueError(f"LH 목록 파싱 실패(mi={mi}): 공고 행이 없음")
                 items.extend(page_items)
                 if not form or not self.should_fetch_next_page(page_items, is_known, baseline, PAGE_SIZE):
