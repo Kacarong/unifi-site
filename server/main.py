@@ -19,11 +19,12 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import auth
+from . import auth, log_redact
 from .registry import AppSpec, discover
 
 log = logging.getLogger("unifi")
 logging.basicConfig(level=os.environ.get("UNIFI_LOG_LEVEL", "INFO"))
+log_redact.install()  # httpx 요청 로그에 serviceKey 등이 찍히지 않게
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHELL_STATIC = os.path.join(HERE, "static")
