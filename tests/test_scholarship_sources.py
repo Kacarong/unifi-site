@@ -430,6 +430,48 @@ def test_details() -> None:
     check("'지원자격, 제출서류 등은 붙임 참조' 같은 묶음 제목은 내용으로 안 씀", "세부사항" in got["details"].get("special", ""), False)
     check("상세만 보려고 연 공고문은 생활비 판정에 안 씀", "생활비" in got["excerpt"], False)
 
+    got = boards.details("○ 다음 사항에 해당할 시, 서류심사를 진행하지 않음\n- 필수 제출 서류 누락\n- 허위 기재\n"
+                         "3. 제출 서류\n○ (필수) 온라인 지원서 1부, 대학교 성적증명서\n4. 유의 사항\n○ 기타")
+    check("'필수 제출 서류 누락' 같은 문장 속 낱말은 제목이 아님 — 뒤의 진짜 '3. 제출 서류' 를 읽음",
+          got.get("documents"), "○ (필수) 온라인 지원서 1부, 대학교 성적증명서")
+
+    post = ("<h3>2026 인석 장학생 선발 안내</h3><p>작성일 2026-10-14</p><p>접수 마감: 2026. 11. 26.까지</p>"
+            + "<p>자세한 지원 자격과 제출 서류는 붙임 공고문을 꼭 확인하여 주시기 바랍니다. 많은 지원 바랍니다.</p>" * 3
+            + '<a href="/down.php?f=2">선발공고.hwpx</a>')
+    fetcher = FakeFetcher({
+        "down.php": _hwpx("○ 지원자격: 4년제 대학 재학생\n○ 제출서류: 지원서 1부\n○ 선발인원: 10명"),
+        "view": post.encode(),
+    })
+    got = boards.read_post(fetcher, {"title": "2026 인석 장학생 선발 안내", "url": "https://x.example/view",
+                                     "posted": D("2026-10-14")})
+    check("본문엔 마감만, 공고문엔 날짜 없이 자격·서류만 있어도 상세는 공고문에서",
+          (got["end"], got["details"].get("special"), got["details"].get("documents")),
+          (D("2026-11-26"), "4년제 대학 재학생", "지원서 1부"))
+
+    print("공고 대상(학적)")
+    check("대학원만 말하는 제목은 대학원 과정으로", boards.grades_of("2027년 의생명과학분야 대학원 장학생 선발 안내"),
+          ["석사신입생(1학기)", "석사2학기이상", "박사과정"])
+    check("'대학 장학생' 은 학부", boards.grades_of("2027년 의생명과학분야 대학 장학생 선발 안내"), [])
+    grad = {"name": "대학원 장학생", "grades": boards.grades_of("2027년 의생명과학분야 대학원 장학생 선발 안내")}
+    check("대학원 공고는 '재학생' 조건에서 빠짐", logic.matches({"level": "재학생"}, grad), False)
+    check("중학교 2학년만 뽑는 구 장학회 공고는 대학생 공고가 아님",
+          boards.for_college({"notice_title": "남구장학회 해외역사문화체험 장학생 선발계획 공고",
+                              "special": "- 남구에 3년 이상 거주하는 중학교 2학년 재학생"}), False)
+    check("고교·대학 둘 다 뽑는 공고는 남김",
+          boards.for_college({"notice_title": "기장군 장학금 신청 알림", "special": "고등학생 및 대학생"}), True)
+    fetcher = FakeFetcher({
+        "no=7": ("<h3>남구장학회 해외역사문화체험 장학생 선발계획 공고</h3><p>작성일 2026-10-20</p>"
+                 "<p>○ 신청기간: 2026. 10. 20. ~ 11. 20.</p><p>○ 지원 자격 : 남구에 3년 이상 거주하는 중학교 2학년 재학생</p>"
+                 + "<p>남구장학회에서 미래 인재를 위한 해외 역사문화 체험 장학생을 아래와 같이 선발하오니 많은 신청 바랍니다.</p>" * 2).encode(),
+        "list": ('<table><tr><td><a href="/b?no=7">남구장학회 해외역사문화체험 장학생 선발계획 공고</a></td>'
+                 '<td>26.10.20</td></tr></table>').encode(),
+    })
+    stats: dict = {}
+    got = boards.collect([{"id": "namgu", "label": "부산 남구장학회", "org": "(재)부산광역시 남구장학회",
+                           "region": "부산광역시 남구", "url": "https://www.bsnamgu.go.kr/list"}],
+                         today=TODAY, fetcher=fetcher, stats=stats)
+    check("수집할 때 초·중·고 전용 공고는 뺌", (got, stats["namgu"]["picked"], stats["namgu"]["items"]), ([], 1, 0))
+
     print("게시판 형식")
     rows = boards.list_posts('<table><tr><td><a href="/v?n=1">2026년도 하반기 기장군 장학금 신청 알림</a></td>'
                              '<td>051-709-4000</td><td>26.09.18</td></tr></table>', "https://www.gijang.go.kr/l")

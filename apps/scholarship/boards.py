@@ -23,7 +23,7 @@ import urllib.parse
 import urllib.request
 from typing import Any
 
-from . import docs
+from . import docs, dreamspon
 
 _UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36"
 
@@ -424,7 +424,9 @@ _SECTION_LABELS = {
     "documents": r"제출\s*서류|구비\s*서류|신청\s*서류",
     "how": r"신청\s*방법|접수\s*방법|신청\s*경로|제출\s*방법|신청\s*절차",
 }
-_BULLET = r"[\s\d.)(Ⅰ-Ⅹ가-하□■○◎●◦▶▷◆◇※\-–·•❍◈ㅇㅁ]*"
+# 줄 앞 번호·기호만 — '가.' '나)' 처럼 뒤에 점·괄호가 붙은 글자 하나만 번호로 본다.
+# (글자 범위 [가-하] 를 그대로 쓰면 '필수 제출 서류 누락' 의 '필수' 까지 번호로 먹어 제목이 된다)
+_BULLET = r"(?:[\s\d.)(\[\]Ⅰ-Ⅹ□■▢○◎●◦▶▷◆◇※\-–·•❍◈◾➊-➓①-⑳]|[가-힣](?=\s*[.)])|[ㅇㅁ](?=\s))*"
 _SECTION_HEAD = re.compile(
     "^" + _BULLET + r"(?:장학금\s*|장학생\s*)?(?:"
     + "|".join(f"(?P<{k}>{v})" for k, v in _SECTION_LABELS.items())
@@ -550,6 +552,7 @@ def read_post(f: Fetcher, post: dict[str, Any]) -> dict[str, Any]:
     texts = [content]  # 지원 내용 요약·상세를 뽑을 글자 — 본문, 그리고 읽은 공고문
     files = attachments(page, final_url)[:MAX_FILES]
     opened = 0
+    detail_only: list[str] = []  # 날짜는 없었지만 연 공고문 — 상세 칸에만 쓴다
     if not (start and end):
         for url, name in files:
             try:
@@ -566,8 +569,10 @@ def read_post(f: Fetcher, post: dict[str, Any]) -> dict[str, Any]:
             if e2 and not end:
                 end, where = e2, f"첨부 {name or '공고문'}"
                 texts.append(ftext)
+            else:
+                detail_only.append(ftext)
     info = details(content)
-    for t in texts[1:]:
+    for t in texts[1:] + detail_only:
         info = {**details(t), **info}  # 본문에 적힌 것을 먼저, 빈 칸만 공고문에서
     if len(info) < 3 and files and not opened:
         # 본문에 날짜만 있고 자세한 것은 공고문에 있는 글이 많다 — 첫 공고문 하나만 더 읽는다
@@ -581,6 +586,25 @@ def read_post(f: Fetcher, post: dict[str, Any]) -> dict[str, Any]:
             pass
     return {"start": start, "end": end, "where": where, "excerpt": _excerpt("\n".join(texts)),
             "posted": ref, "details": info}
+
+
+# 학적 — 공고 제목·자격 칸에 적힌 대상. 학교·구청 게시판에는 중·고등학생 공고와 대학원 공고가 섞인다.
+_SCHOOL_KID = re.compile(r"초등|중학|고등학|고교")
+_COLLEGE = re.compile(r"대학|학부|전문대")
+_GRAD = re.compile(r"대학원|석사|박사")
+_UNDERGRAD = re.compile(r"대학생|학부|대학\s*장학생|대학교")
+
+
+def for_college(item: dict[str, Any]) -> bool:
+    """대학생·대학원생이 받을 수 있는 공고인가. '중학교 2학년 재학생' 처럼 초·중·고만 적고
+    대학을 한 번도 말하지 않는 공고만 아니라고 본다."""
+    target = f"{item.get('notice_title') or item.get('name', '')}\n{item.get('special', '')}"
+    return not (_SCHOOL_KID.search(target) and not _COLLEGE.search(target))
+
+
+def grades_of(title: str) -> list[str]:
+    """제목이 대학원만 말하면 대학원 과정으로(학부 재학생의 '내 조건' 에서 빠지게). 그 밖에는 모름([])."""
+    return list(dreamspon.GRAD_ONLY) if _GRAD.search(title) and not _UNDERGRAD.search(title) else []
 
 
 def pick(board: dict[str, Any], posts: list[dict[str, Any]], today: dt.date) -> list[dict[str, Any]]:
@@ -646,7 +670,7 @@ def collect(boards: list[dict[str, Any]] | None = None, today: dt.date | None = 
                 "category": "지역연고" if board.get("region") else "",
                 "region": board.get("region", ""),
                 "schools": [],
-                "grades": [],
+                "grades": grades_of(title),
                 "fields": [],
                 "url": post["url"],
                 "start": start_s,
@@ -660,5 +684,8 @@ def collect(boards: list[dict[str, Any]] | None = None, today: dt.date | None = 
                 "period_from": got["where"],
                 **got["details"],
             })
+            if not for_college(out[-1]):
+                out.pop()  # 초·중·고 전용 공고
+                continue
             stat["items"] += 1
     return out

@@ -106,7 +106,8 @@ def sync_extra(today: dt.date | None = None) -> dict[str, Any]:
 
     def from_active(it: dict[str, Any]) -> bool:
         # 끄거나 지운 게시판의 공고는 남기지 않는다(예전 자료는 source_id 가 없어 이름으로 찾는다)
-        return (it.get("source_id") or label_to_id.get(it.get("source", ""))) in active_ids
+        # 초·중·고 전용으로 판정된 공고도 남기지 않는다(판정 전에 모아 둔 것 포함)
+        return (it.get("source_id") or label_to_id.get(it.get("source", ""))) in active_ids and boards.for_college(it)
 
     notices: list[dict[str, Any]] = []
     try:
