@@ -2,7 +2,7 @@
 
 한 시간마다 한 번 깬다.
   - 원본(공공데이터포털)은 6시간마다 파일 번호만 확인하고 바뀌었을 때만 받는다.
-  - 한국장학재단 실시간 포털, 드림스폰, 공고 게시판(대한토목학회·재단)은 6시간마다 본다.
+  - 한국장학재단 실시간 포털, 드림스폰, 공고 게시판(학회·재단·부경대·부산 구·군 장학회)은 6시간마다 본다.
     CSV 는 한 달에 한 번이라, 그 사이에 올라온 공고를 여기서 채운다.
   - 알림은 깨어날 때마다 고르되, 밤(22시~8시)에는 보내지 않고 아침까지 미룬다.
 """
@@ -216,7 +216,7 @@ def build_message(note: dict[str, Any], settings: dict[str, Any], site_url: str,
     embed: dict[str, Any] = {"title": title, "description": desc[:4000], "color": color}
     if site_url:
         embed["url"] = site_url.rstrip("/") + "/apps/scholarship/"
-    embed["footer"] = {"text": "출처: 한국장학재단 학자금지원정보·포털, 드림스폰, 대한토목학회·재단 공고 · 자격은 공고 원문으로 꼭 확인하세요"}
+    embed["footer"] = {"text": "출처: 한국장학재단 학자금지원정보·포털, 드림스폰, 학회·재단·학교·구청 공고 · 자격은 공고 원문으로 꼭 확인하세요"}
 
     payload: dict[str, Any] = {"embeds": [embed]}
     mention = _mention(settings.get("discord_mention", ""))

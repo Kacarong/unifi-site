@@ -374,6 +374,94 @@ def test_dreamspon() -> None:
           ["부경대 등록·장학 공지"])
 
 
+NOTICE_TEXT = """
+2027년도 제2기 장학생 선발 공고
+1. 선발 인원 : 총 90 명
+   1   대 학 생        50명    총 5,000,000 원
+2. 선발 대상
+ 가. 지원 자격 : 엔지니어링 및 에너지 관련 학과 재학생
+    1) 국내 4 년제 대학 3학기 이상 재학 중인 자
+    2) 평균 평점 3.0 이상인 자
+3. 선발 절차
+ 가. 서류 전형
+4. 제출 서류
+             1. 장학금 지원서(재단 양식) 1 부
+             2. 재학증명서 및 성적증명서 각 1 부
+5. 신청 방법 : 재단 이메일 접수
+□ 지원자격 및 제출서류(학부).hwp
+"""
+
+
+def test_details() -> None:
+    print("공고 상세 읽기")
+    got = boards.details(NOTICE_TEXT)
+    check("선발 인원은 제목 줄 뒤 글자부터", got.get("quota", "").splitlines()[0], "총 90 명")
+    check("지원 자격은 아래 줄까지, 다음 큰 제목(3.) 앞에서 끊음", got.get("special"),
+          "엔지니어링 및 에너지 관련 학과 재학생\n1) 국내 4 년제 대학 3학기 이상 재학 중인 자\n2) 평균 평점 3.0 이상인 자")
+    check("제출 서류는 번호 붙은 줄도 모음(제목보다 깊은 줄)", got.get("documents"),
+          "1. 장학금 지원서(재단 양식) 1 부\n2. 재학증명서 및 성적증명서 각 1 부")
+    check("신청 방법", got.get("how"), "재단 이메일 접수")
+    check("첨부 이름 줄은 제목으로 보지 않음", "학부" in got.get("special", ""), False)
+
+    page = "\n".join([
+        "등록금안내", "장학제도", "등록금안내", "2026 푸른등대 기부장학금 선발 안내", "학생복지과",
+        "2026 푸른등대 기부장학금 선발 안내",
+        "한국장학재단에서 2026년 2학기 푸른등대 기부장학금 신규장학생을 아래와 같이 선발하오니 많은 신청 바랍니다."
+        " 저소득층 대학생에게 학기당 생활비 250만 원을 지원합니다. 신청은 재단 누리집에서 받습니다.",
+        "- 신청방법: 한국장학재단 누리집", "이전글", "등록금안내 장학 일정",
+    ])
+    body = boards.content_of(page, "2026 푸른등대 기부장학금 선발 안내")
+    check("메뉴·이전글을 덜어 낸 본문", ("등록금안내" in body, "신청방법" in body), (False, True))
+    check("메뉴의 '등록금안내' 가 지원 내용 요약에 안 섞임", "등록금안내" in boards._excerpt(body), False)
+    check("제목을 못 찾으면 본문 그대로", boards.content_of(page, "다른 글 제목입니다"), page)
+
+    post = ("<h3>2026 정효택 장학생 선발 계획</h3><p>작성일 2026-10-14</p><p>신청기간: 2026. 10. 14. ~ 10. 19.</p>"
+            + "<p>지원자격, 제출서류 등 세부사항은 붙임 모집공고 참조 바랍니다. 학과 사무실로 문의하세요."
+            + " 장학생 선발 계획을 안내드리니 많은 신청 바랍니다.</p>" * 3
+            + '<a href="/down.php?f=1">모집공고.hwpx</a>')
+    fetcher = FakeFetcher({
+        "down.php": _hwpx("○ 선발인원: 8명\n○ 지원자격: 학부 3, 4학년 재학생\n○ 제출서류: 지원서 1부\n○ 장학금액: 2,000,000원(생활비지원)"),
+        "view": post.encode(),
+    })
+    got = boards.read_post(fetcher, {"title": "2026 정효택 장학생 선발 계획", "url": "https://x.example/view",
+                                     "posted": D("2026-10-14")})
+    check("본문에 날짜가 있어도 상세는 공고문에서", (got["end"], got["details"].get("quota"), got["details"].get("special")),
+          (D("2026-10-19"), "8명", "학부 3, 4학년 재학생"))
+    check("'지원자격, 제출서류 등은 붙임 참조' 같은 묶음 제목은 내용으로 안 씀", "세부사항" in got["details"].get("special", ""), False)
+    check("상세만 보려고 연 공고문은 생활비 판정에 안 씀", "생활비" in got["excerpt"], False)
+
+    print("게시판 형식")
+    rows = boards.list_posts('<table><tr><td><a href="/v?n=1">2026년도 하반기 기장군 장학금 신청 알림</a></td>'
+                             '<td>051-709-4000</td><td>26.09.18</td></tr></table>', "https://www.gijang.go.kr/l")
+    check("두 자리 연도 날짜('26.09.18')를 게시일로, 전화번호는 날짜로 안 봄", rows[0]["posted"], D("2026-09-18"))
+    rows = boards.list_posts(
+        '<table><tr><td><a href="/af/Detail.do" onclick="fnDetail(11306); return false;">2027년 아산장학생 선발 안내</a></td>'
+        '<td>2026.10.01</td></tr><tr><td><a href="/af/Detail.do" onclick="fnDetail(11305); return false;">'
+        '2027년 북한이탈청소년장학생 선발 안내</a></td><td>2026.10.01</td></tr></table>',
+        "https://www.asanfoundation.or.kr/af/List.do", [r"fnDetail\((\d+)\)", "https://x.example/Detail.do?idx={}"])
+    check("글 번호가 onclick 에만 있는 게시판", [r["url"] for r in rows],
+          ["https://x.example/Detail.do?idx=11306", "https://x.example/Detail.do?idx=11305"])
+    files = boards.attachments(
+        """<a href="javascript:file_download('/download?db=1&id=5350&no=0', '안내문.pdf');">붙임1) 추천 안내문.pdf (115.2K)</a>""",
+        "https://www.kosffl.or.kr/news/notice?page=view&id=5350")
+    check("javascript:file_download('…') 첨부는 안의 주소로", [u for u, _ in files],
+          ["https://www.kosffl.or.kr/download?db=1&id=5350&no=0"])
+    check("그누보드 '… H 인기글 (미리보기)' 꼬리 떼기",
+          boards.clean_title("인재림(人材林) 제7기 지원자 모집 H 인기글 인재림(人材林) 제7기 지원자 모집 중~! 장학 프로그램"),
+          "인재림(人材林) 제7기 지원자 모집")
+    check("제목을 두 칸에 적은 목록", boards.clean_title("부산지역인재 장학금 공고 부산지역인재 장학금 공고"), "부산지역인재 장학금 공고")
+    kfas = {"want": r"장학|지원자\s*모집"}
+    check("장학 재단 게시판은 '장학' 없는 모집 글도, 미리보기의 '장학' 으로는 안 받음",
+          [p["url"] for p in boards.pick(kfas, [
+              {"title": "인재림(人材林) 제7기 지원자 모집 H 인기글", "posted": D("2026-10-07"), "url": "a"},
+              {"title": "드림렉처 학교 신청 접수 H 인기글 재단의 장학프로그램을 통해", "posted": D("2026-08-21"), "url": "b"},
+          ], TODAY)], ["a"])
+    item = {"region": "부산광역시 남구", "category": "지역연고", "org": "(재)부산광역시 남구장학회"}
+    check("구·군 장학회 공고는 그 구 주민 것으로", (logic.region_verdict({"regions": "부산"}, item),
+          logic.region_verdict({"regions": "부산, 해운대구"}, item), logic.region_verdict({"regions": "광주"}, item)),
+          ("ok", "no", "no"))
+
+
 def test_review_regressions() -> None:
     print("학교 게시판 공고끼리 합치지 않기 · 못 본 공고 남기기 · 일정 미확인")
     from apps.scholarship import worker
@@ -440,6 +528,7 @@ def main() -> int:
     test_merge()
     test_dreamspon()
     test_review_regressions()
+    test_details()
     if FAILURES:
         print(f"\n실패 {len(FAILURES)}건")
         return 1

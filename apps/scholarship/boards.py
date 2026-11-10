@@ -1,4 +1,4 @@
-"""공고 게시판 — 대한토목학회·재단 홈페이지에 올라온 장학생 모집 글.
+"""공고 게시판 — 대한토목학회·재단·부경대·부산 구·군 장학회 홈페이지에 올라온 장학생 모집 글.
 
 한국장학재단 자료에는 늦게 올라오거나 아예 안 올라오는 공고가 있다. 게시판 목록에서
 '장학 + 모집/선발' 제목을 고르고, 글 본문에서 신청 기간을 읽는다. 본문에 없으면
@@ -89,6 +89,73 @@ BOARDS: list[dict[str, Any]] = [
         "org": "인석장학회",
         "url": "https://www.inseok.org/board5/bbs/board.php?bo_table=notice_1",
     },
+    {
+        "id": "pknu_civil_notice",
+        "label": "부경대 토목공학과 공지",
+        "org": "부경대학교 토목공학과",
+        "url": "https://civil.pknu.ac.kr/civil/5345?pageIndex=1&bbsId=2402699&searchCondition=title&searchKeyword=%EC%9E%A5%ED%95%99",
+        "loose": True,
+    },
+    {
+        "id": "kosffl",
+        "label": "한국지도자육성장학재단",
+        "org": "(재)한국지도자육성장학재단",
+        "url": "https://www.kosffl.or.kr/news/notice",
+    },
+    {
+        "id": "kfas",
+        "label": "한국고등교육재단",
+        "org": "(재)한국고등교육재단",
+        # https 는 인증서 체인이 덜 갖춰져 있어 열리지 않는다
+        "url": "http://www.kfas.or.kr/bbs/board.php?bo_table=kfas_2028_ntc_latest&sca=%EA%B3%B5%EC%A7%80%EC%82%AC%ED%95%AD",
+        "want": r"장학|지원자\s*모집",  # '인재림(人材林) 제7기 지원자 모집'
+    },
+    {
+        "id": "asan",
+        "label": "아산사회복지재단",
+        "org": "아산사회복지재단",
+        "url": "https://www.asanfoundation.or.kr/af/foundation/notice/afFoundationNoticeList.do?noticeTypeClsf=N",
+        # 모든 행의 href 가 같고 글 번호는 onclick="fnDetail(11306)" 에만 있다
+        "link": [r"fnDetail\((\d+)\)",
+                 "https://www.asanfoundation.or.kr/af/foundation/notice/afFoundationNoticeDetail.do?idx={}&noticeTypeClsf=N"],
+    },
+    {
+        "id": "postf",
+        "label": "포스코청암재단",
+        "org": "포스코청암재단",
+        "url": "https://www.postf.org/news/notice",
+    },
+    # 부산 구·군 장학회 — 그 구·군에 사는(보호자가 사는) 학생만 뽑는다. region 으로 지역을 붙인다.
+    {
+        "id": "suyeong",
+        "label": "수영구장학재단",
+        "org": "재단법인 수영구장학재단",
+        "region": "부산광역시 수영구",
+        "url": "https://www.suyeong.go.kr/janghak/board/list.suyeong?boardId=BBS_0000140&menuCd=DOM_000002802001000000&contentsSid=2261",
+    },
+    {
+        "id": "namgu",
+        "label": "부산 남구장학회",
+        "org": "(재)부산광역시 남구장학회",
+        "region": "부산광역시 남구",
+        "url": "https://www.bsnamgu.go.kr/board/list.namgu?boardId=BBS_0000128&menuCd=DOM_000000102010009000&contentsSid=1229",
+    },
+    {
+        "id": "bukgu",
+        "label": "부산 북구청 새소식",
+        "org": "(재)부산북구장학회",
+        "region": "부산광역시 북구",
+        "url": "https://www.bsbukgu.go.kr/board/list.bsbukgu?boardId=BBS_0000023&menuCd=DOM_000000105001001000&contentsSid=368&searchType=DATA_TITLE&keyword=%EC%9E%A5%ED%95%99",
+        "loose": True,
+    },
+    {
+        "id": "gijang",
+        "label": "기장군 알림사항",
+        "org": "부산광역시 기장군",
+        "region": "부산광역시 기장군",
+        "url": "https://www.gijang.go.kr/board/list.gijang?boardId=BBS_0000002&menuCd=DOM_000000101001001000&contentsSid=44&searchType=DATA_TITLE&searchOperation=OR&keyword=%EC%9E%A5%ED%95%99",
+        "loose": True,
+    },
 ]
 
 def all_sources(state: dict[str, Any]) -> list[dict[str, Any]]:
@@ -124,10 +191,12 @@ _WANT = re.compile(r"장학")
 _RECRUIT = re.compile(r"모집|선발|공고|공모|추천|신청")
 _SKIP = re.compile(
     r"결과|발표|합격|명단|수여식|증서|기부금|후기|수기|간담회|워크숍|연구|논문|채용|입찰"
-    r"|지급|납부|분할|서식|양식|변경사항|반환|환수|정정|연장 안내|만족도|설문"
+    r"|지급|납부|분할|서식|양식|변경사항|반환|환수|정정|연장 안내|만족도|설문|소감문|연수\s*교육|면접\s*(?:심사|일정)"
 )
 
 _DATE_IN_ROW = re.compile(r"(20\d\d)\s*[.\-/]\s*(\d{1,2})\s*[.\-/]\s*(\d{1,2})")
+# 구청 게시판은 연도를 두 자리로 적는다('26.09.18'). 네 자리 날짜가 없을 때만 본다.
+_SHORT_DATE_IN_ROW = re.compile(r"(?<![\d.\-])([12]\d)\s*[.\-]\s*(\d\d)\s*[.\-]\s*(\d\d)(?![\d.\-])")
 _DOWNLOAD = re.compile(r"download|file_?down|filedown|fileDown|down\.php|/file/down|atchFile|\.(?:hwp|hwpx|pdf|zip)\b", re.I)
 
 RECENT_DAYS = 150     # 이보다 오래된 글은 지난 회차라 보지 않는다
@@ -209,8 +278,21 @@ def _text(fragment: str) -> str:
     return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", fragment))).strip()
 
 
-def list_posts(page: str, base_url: str) -> list[dict[str, Any]]:
-    """목록 HTML → [{title, url, posted}]. 같은 주소는 한 번만."""
+def _row_date(text: str) -> dt.date | None:
+    for pat, base in ((_DATE_IN_ROW, 0), (_SHORT_DATE_IN_ROW, 2000)):
+        m = pat.search(text)
+        if m:
+            try:
+                return dt.date(base + int(m.group(1)), int(m.group(2)), int(m.group(3)))
+            except ValueError:
+                return None
+    return None
+
+
+def list_posts(page: str, base_url: str, link: tuple[str, str] | list[str] | None = None) -> list[dict[str, Any]]:
+    """목록 HTML → [{title, url, posted}]. 같은 주소는 한 번만.
+    link: 글 주소가 onclick 에만 있는 게시판용 (정규식, 주소 틀) — onclick 의 'fnDetail(11306)' 번호를
+    '…Detail.do?idx={}' 에 넣는다. 맞으면 href 보다 먼저 쓴다(href 는 모든 행이 같은 주소다)."""
     page = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", page)
     chunks = re.findall(r"(?is)<tr[\s>].*?</tr>|<li[\s>].*?</li>|<article[\s>].*?</article>", page)
     seen: set[str] = set()
@@ -218,7 +300,6 @@ def list_posts(page: str, base_url: str) -> list[dict[str, Any]]:
     for chunk in chunks:
         if len(chunk) > 6000:  # 메뉴 전체를 감싼 바깥 <li>
             continue
-        date = _DATE_IN_ROW.search(_text(chunk))
         best = None
         for a in re.finditer(r"(?is)<a\b([^>]*)>(.*?)</a>", chunk):
             attrs, inner = a.group(1), a.group(2)
@@ -226,7 +307,10 @@ def list_posts(page: str, base_url: str) -> list[dict[str, Any]]:
             if len(title) < 6:
                 continue
             href = ""
-            m = re.search(r'href\s*=\s*"([^"]*)"', attrs) or re.search(r"href\s*=\s*'([^']*)'", attrs)
+            lm = re.search(link[0], attrs) if link else None
+            if lm:
+                href = link[1].format(*lm.groups())
+            m = None if href else re.search(r'href\s*=\s*"([^"]*)"', attrs) or re.search(r"href\s*=\s*'([^']*)'", attrs)
             if m and not m.group(1).lower().startswith(("javascript", "#")):
                 href = _unescape_url(m.group(1))
             if not href:
@@ -239,13 +323,7 @@ def list_posts(page: str, base_url: str) -> list[dict[str, Any]]:
         if url in seen:
             continue
         seen.add(url)
-        posted = None
-        if date:
-            try:
-                posted = dt.date(int(date.group(1)), int(date.group(2)), int(date.group(3)))
-            except ValueError:
-                posted = None
-        out.append({"title": best[0], "url": url, "posted": posted})
+        out.append({"title": best[0], "url": url, "posted": _row_date(_text(chunk))})
     return out
 
 
@@ -270,12 +348,15 @@ def clean_title(title: str) -> str:
     """'applying 2027년 … 선발 안내 신청기간 2026-10-14 ~ …' 처럼 목록 칸이 같이 붙은 제목을 다듬는다."""
     title = re.sub(r"^[a-z]+\s+", "", title.strip())
     title = re.sub(r"^(?:공지|NOTICE|\d{1,6})\s+", "", title)  # 번호·공지 칸
-    title = re.split(r"\s+(?:신청|접수|모집)기간\b|\s+(?:NEW|UPDATED|new)\b|\s+20\d\d[.\-/]\d\d?[.\-/]\d\d?\b", title)[0]
-    return title.strip()
+    title = re.split(r"\s+(?:신청|접수|모집)기간\b|\s+(?:NEW|UPDATED|new)\b|\s+20\d\d[.\-/]\d\d?[.\-/]\d\d?\b"
+                     r"|\s+(?:[HN]\s+)?인기글(?![가-힣])", title)[0]  # 그누보드 '… H 인기글 (본문 미리보기)'
+    twice = re.fullmatch(r"(.{6,}?)\s+\1", title.strip())  # 같은 제목을 두 칸에 적은 목록
+    return (twice.group(1) if twice else title).strip()
 
 
-def wanted(title: str, loose: bool = False) -> bool:
-    if not _WANT.search(title) or _SKIP.search(title):
+def wanted(title: str, loose: bool = False, want: str = "") -> bool:
+    """want: 장학 재단처럼 제목에 '장학' 이 없는 모집 글('인재림 제7기 지원자 모집')을 올리는 게시판의 주제 낱말."""
+    if not re.search(want or _WANT.pattern, title) or _SKIP.search(title):
         return False
     return loose or bool(_RECRUIT.search(title))
 
@@ -289,6 +370,12 @@ def attachments(page: str, base_url: str) -> list[tuple[str, str]]:
         if not m:
             continue
         href = _unescape_url(m.group(1))
+        if href.lower().startswith("javascript"):
+            # javascript:file_download('/download?db=1&id=5350&no=0', '공고문.pdf') — 안의 주소를 쓴다
+            js = re.search(r"""['"]((?:/|https?://)[^'"]+)['"]""", href)
+            if not js:
+                continue
+            href = js.group(1)
         name = _text(inner)
         if not (_DOWNLOAD.search(href) or re.search(r"\.(hwp|hwpx|pdf|zip)\b", name, re.I)):
             continue
@@ -301,7 +388,7 @@ def attachments(page: str, base_url: str) -> list[tuple[str, str]]:
     return out
 
 
-_AMOUNT = re.compile(r"\d[\d,]*\s*만\s*원|생활비|생활\s*지원|학업\s*장려|등록금")
+_AMOUNT = re.compile(r"\d[\d,]*\s*만\s*원|\d{1,3}(?:,\d{3})+\s*원|생활비|생활\s*지원|학업\s*장려|등록금")
 
 
 _LIVING_LINE = re.compile(r"생활비|생활\s*지원|생활\s*장학|학업\s*장려|생활안정")
@@ -314,13 +401,129 @@ def _excerpt(text: str) -> str:
     living, other = [], []
     for ln in text.splitlines():
         ln = re.sub(r"\s+", " ", ln).strip()
-        if not (4 <= len(ln) <= 90) or re.search(r"중지|환수|제외|불가", ln):
+        if not (4 <= len(ln) <= 90) or re.search(r"중지|환수|제외|불가", ln) or _SECTION_JUNK.search(ln):
             continue
         if _LIVING_LINE.search(ln):
             living.append("○ " + ln)
         elif _AMOUNT.search(ln):
             other.append("○ " + ln)
     return "\n".join((living[:2] + other)[:3])
+
+
+# ---------------------------------------------------------------------------
+# 공고 상세 — 지원 자격·선발 인원·선발 방법·제출 서류·신청 방법
+#
+# 공고문은 '1. 선발 인원 : 총 90명', '□ 지원자격', '가. 제출서류' 처럼 항목 제목을 줄 앞에
+# 두고 그 아래에 내용을 적는다. 제목 줄을 찾아 다음 제목이 나올 때까지(최대 8줄) 모은다.
+# 한국장학재단 자료의 같은 칸(special·quota·selection·documents)에 넣어 화면이 똑같이 보인다.
+# ---------------------------------------------------------------------------
+_SECTION_LABELS = {
+    "special": r"(?:지원|신청|응모|선발|추천|장학생)\s*자격|(?:지원|선발|신청|모집|장학)\s*대상(?:자)?|자격\s*(?:요건|기준|조건)",
+    "quota": r"선발\s*(?:인원|규모|예정\s*인원)|모집\s*인원|지원\s*규모",
+    "selection": r"선발\s*(?:방법|절차|기준)|심사\s*(?:방법|기준|절차)|전형\s*(?:방법|절차)",
+    "documents": r"제출\s*서류|구비\s*서류|신청\s*서류",
+    "how": r"신청\s*방법|접수\s*방법|신청\s*경로|제출\s*방법|신청\s*절차",
+}
+_BULLET = r"[\s\d.)(Ⅰ-Ⅹ가-하□■○◎●◦▶▷◆◇※\-–·•❍◈ㅇㅁ]*"
+_SECTION_HEAD = re.compile(
+    "^" + _BULLET + r"(?:장학금\s*|장학생\s*)?(?:"
+    + "|".join(f"(?P<{k}>{v})" for k, v in _SECTION_LABELS.items())
+    + r")\s*(?:\([^)]{0,20}\))?\s*(?P<rest>[:：].*|\s.{0,80}|)$"
+)
+# 두 항목을 한 제목에 묶은 줄('지원자격 및 제출서류', '지원자격, 심사방법 등은 붙임 참조')
+_JOINED_HEAD = re.compile(r"^(?:및|,|·|/|등)")
+_SECTION_STOP = re.compile(r"^(?:이전\s*글|다음\s*글|목록\s*보기|목록|첨부\s*파일)(?![가-힣])|^(?:이전|다음)$")
+_SECTION_JUNK = re.compile(r"\.(?:hwpx?|pdf|zip|docx?|jpe?g|png)\b|·{4,}|\.{6,}|^\[?붙임", re.I)
+SECTION_LINES = 8
+SECTION_CHARS = 500
+
+# 줄 앞 번호의 종류와 깊이. '1.' 아래에 '가.', 그 아래에 '1)', '가)' 를 쓰는 공문 관례를 따른다.
+_MARKS = [
+    ("roman", 0, re.compile(r"\s*([Ⅰ-Ⅹ])")),
+    ("num.", 1, re.compile(r"\s*(\d{1,2})\s*\.(?!\d)")),
+    ("box", 1, re.compile(r"\s*[□■]")),
+    ("kor.", 2, re.compile(r"\s*([가-하])\s*\.")),
+    ("num)", 3, re.compile(r"\s*\(?(\d{1,2})\)")),
+    ("kor)", 3, re.compile(r"\s*\(?([가-하])\)")),
+]
+
+
+def _mark(line: str) -> tuple[str, int, int | None] | None:
+    """(종류, 깊이, 번호) — 번호가 없는 표시(□)는 None."""
+    for kind, level, pat in _MARKS:
+        m = pat.match(line)
+        if m:
+            g = m.group(1) if m.groups() else None
+            n = int(g) if g and g.isdigit() else (ord(g) if g else None)
+            return kind, level, n
+    return None
+
+
+def details(text: str) -> dict[str, str]:
+    """공고 글자 → {special, quota, selection, documents, how} 중 찾은 것만.
+    제목 줄 다음부터 다음 항목 제목, 또는 제목과 같거나 얕은 번호 줄('3.') 앞까지 모은다.
+    내용이 '1. … 2. …' 처럼 제목과 같은 깊이의 번호 목록이면 번호가 이어지는 동안은 계속 모은다."""
+    lines = [re.sub(r"\s+", " ", ln).strip() for ln in (text or "").splitlines()]
+    lines = [ln for ln in lines if ln and not _SECTION_JUNK.search(ln)]
+    out: dict[str, str] = {}
+    i = 0
+    while i < len(lines):
+        m = _SECTION_HEAD.match(lines[i]) if len(lines[i]) <= 120 else None
+        if not m:
+            i += 1
+            continue
+        key = next(k for k in _SECTION_LABELS if m.group(k))
+        rest = re.sub(r"^[:：]\s*", "", m.group("rest").strip())
+        if _JOINED_HEAD.match(rest):
+            rest = ""
+        body = [rest] if rest else []
+        head = _mark(lines[i])
+        level = head[1] if head else 2
+        run: tuple[str, int | None] | None = None  # 내용이 번호 목록일 때 (종류, 마지막 번호)
+        j = i + 1
+        while j < len(lines) and len(body) < SECTION_LINES:
+            ln = lines[j]
+            if _SECTION_STOP.match(ln) or _SECTION_HEAD.match(ln):
+                break
+            mk = _mark(ln)
+            if mk and mk[1] <= level:
+                listed = (not body and mk[2] == 1 and mk[0] != "roman") or (
+                    run and run[0] == mk[0] and run[1] is not None and mk[2] == run[1] + 1)
+                if not listed:
+                    break
+                run = (mk[0], mk[2])
+            body.append(ln)
+            j += 1
+        got = "\n".join(body).strip()
+        if len(re.findall(r"[가-힣0-9]", got)) >= 2 and key not in out:
+            if len(got) > SECTION_CHARS:
+                got = got[:SECTION_CHARS].rsplit("\n", 1)[0] + "\n…"
+            out[key] = got
+        i = j
+    return out
+
+
+_CONTENT_END = re.compile(r"^(?:이전\s*글|다음\s*글|목록\s*보기)(?![가-힣])")
+
+
+def content_of(body: str, title: str) -> str:
+    """글 화면 글자에서 메뉴·이전글/다음글을 덜어 낸 본문 — 글 제목 줄부터 '이전글/다음글' 앞까지.
+    메뉴의 '등록금안내' 같은 줄이 지원 내용 요약에 섞이지 않게 한다. 제목 줄은 제목만 적힌 짧은
+    줄이다(본문 문장 속 제목은 아니다). 여러 번 나오면(쪽 제목, 경로, 글 제목) 뒤의 것부터 보되,
+    이전글/다음글 바로 뒤의 제목(같은 이름의 지난 회차)과 본문이 거의 없는 곳은 건너뛴다."""
+    head = re.sub(r"\s+", " ", clean_title(title))[:15]
+    lines = body.splitlines()
+    flat = [re.sub(r"\s+", " ", ln).strip() for ln in lines]
+    if len(head) >= 6:
+        limit = len(clean_title(title)) + 30
+        hits = [i for i, ln in enumerate(flat) if head in ln and len(ln) <= limit
+                and not any(_CONTENT_END.match(x) for x in flat[max(0, i - 2):i])]
+        for start in reversed(hits):
+            end = next((i for i in range(start + 1, len(flat)) if _CONTENT_END.match(flat[i])), len(flat))
+            part = "\n".join(lines[start:end])
+            if len(re.findall(r"[가-힣]", part)) >= 80:
+                return part
+    return body
 
 
 def _key(*parts: str) -> str:
@@ -335,35 +538,56 @@ def _org_from_title(title: str, default: str) -> str:
 
 
 def read_post(f: Fetcher, post: dict[str, Any]) -> dict[str, Any]:
-    """글을 열어 신청 기간을 읽는다. 본문 → 첨부 순서."""
+    """글을 열어 신청 기간과 상세(자격·인원·서류…)를 읽는다. 본문 → 첨부 순서."""
     data, final_url, ctype = f.get(post["url"])
     page = decode_html(data, ctype)
     body = docs.html_text(page)
+    content = content_of(body, post.get("title", ""))
     # 게시일을 모르면 None 으로 둔다 — 오늘을 기준으로 연도를 고치면 지난 회차가 올해로 둔갑한다
     ref = post.get("posted") or posted_in_page(body)
     start, end = docs.find_period(body, ref)
-    where, text = "본문", body
+    where = "본문"
+    texts = [content]  # 지원 내용 요약·상세를 뽑을 글자 — 본문, 그리고 읽은 공고문
+    files = attachments(page, final_url)[:MAX_FILES]
+    opened = 0
     if not (start and end):
-        for url, name in attachments(page, final_url)[:MAX_FILES]:
+        for url, name in files:
             try:
                 blob, _, _ = f.get(url, referer=final_url)
             except Exception:  # noqa: BLE001 - 첨부 하나 실패는 넘어간다
                 continue
+            opened += 1
             ftext = docs.text_of(blob, name)
             s2, e2 = docs.find_period(ftext, ref)
             if s2 and e2:
-                start, end, where, text = s2, e2, f"첨부 {name or '공고문'}", ftext
+                start, end, where = s2, e2, f"첨부 {name or '공고문'}"
+                texts.append(ftext)
                 break
             if e2 and not end:
-                end, where, text = e2, f"첨부 {name or '공고문'}", ftext
-    return {"start": start, "end": end, "where": where, "excerpt": _excerpt(text), "posted": ref}
+                end, where = e2, f"첨부 {name or '공고문'}"
+                texts.append(ftext)
+    info = details(content)
+    for t in texts[1:]:
+        info = {**details(t), **info}  # 본문에 적힌 것을 먼저, 빈 칸만 공고문에서
+    if len(info) < 3 and files and not opened:
+        # 본문에 날짜만 있고 자세한 것은 공고문에 있는 글이 많다 — 첫 공고문 하나만 더 읽는다
+        url, name = files[0]
+        try:
+            blob, _, _ = f.get(url, referer=final_url)
+            # 상세 칸만 채운다. 지원 내용 요약(생활비 판정)에는 넣지 않는다 — 업무처리기준 같은
+            # 긴 문서의 '생활비 대출', '생활비 … 인정' 줄이 생활비 장학금으로 잘못 읽힌다.
+            info = {**details(docs.text_of(blob, name)), **info}
+        except Exception:  # noqa: BLE001
+            pass
+    return {"start": start, "end": end, "where": where, "excerpt": _excerpt("\n".join(texts)),
+            "posted": ref, "details": info}
 
 
 def pick(board: dict[str, Any], posts: list[dict[str, Any]], today: dt.date) -> list[dict[str, Any]]:
     loose = bool(board.get("loose"))
     return [
         p for p in posts
-        if wanted(p["title"], loose)
+        if wanted(clean_title(p["title"]), loose, board.get("want", ""))
         and (p["posted"] is None and not loose or p["posted"] and (today - p["posted"]).days <= RECENT_DAYS)
     ][:MAX_POSTS]
 
@@ -382,7 +606,7 @@ def collect(boards: list[dict[str, Any]] | None = None, today: dt.date | None = 
             stats[board["id"]] = stat
         try:
             data, final_url, ctype = f.get(board["url"])
-            posts = list_posts(decode_html(data, ctype), final_url)
+            posts = list_posts(decode_html(data, ctype), final_url, board.get("link"))
         except Exception as exc:  # noqa: BLE001
             stat["error"] = str(exc)[:200]
             if log:
@@ -418,7 +642,9 @@ def collect(boards: list[dict[str, Any]] | None = None, today: dt.date | None = 
                 "name": name,
                 "org_type": "",
                 "product": "장학금",
-                "category": "",
+                # 구·군 장학회 게시판은 그 지역 주민 자녀만 뽑는다 — 지역 판정(logic.place)에 쓴다
+                "category": "지역연고" if board.get("region") else "",
+                "region": board.get("region", ""),
                 "schools": [],
                 "grades": [],
                 "fields": [],
@@ -432,6 +658,7 @@ def collect(boards: list[dict[str, Any]] | None = None, today: dt.date | None = 
                 "notice_title": title,
                 "posted": posted.isoformat() if posted else "",
                 "period_from": got["where"],
+                **got["details"],
             })
             stat["items"] += 1
     return out

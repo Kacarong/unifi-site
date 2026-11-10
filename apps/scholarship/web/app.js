@@ -169,6 +169,7 @@ const DETAIL_SECTIONS = [
   ['selection', '선발 방법'],
   ['quota', '선발 인원'],
   ['recommend', '추천 필요'],
+  ['how', '신청 방법'],
   ['documents', '제출 서류'],
 ];
 
