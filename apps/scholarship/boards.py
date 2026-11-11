@@ -97,6 +97,13 @@ BOARDS: list[dict[str, Any]] = [
         "loose": True,
     },
     {
+        "id": "pknu_coe",
+        "label": "부경대 공과대학 공지",
+        "org": "부경대학교 공과대학",
+        "url": "https://coe.pknu.ac.kr/?mode=1&menucode=0406010000&kind=title&keyword=%EC%9E%A5%ED%95%99",
+        "loose": True,
+    },
+    {
         "id": "kosffl",
         "label": "한국지도자육성장학재단",
         "org": "(재)한국지도자육성장학재단",
