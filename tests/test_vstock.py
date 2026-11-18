@@ -2,7 +2,7 @@
 
     python3 tests/test_vstock.py
 
-사이트는 virtual-stock.kro.kr 에서 돌고, 여기는 그쪽으로 넘겨 주기만 한다.
+사이트는 virtual-stock.kacarong.kr 에서 돌고, 여기는 그쪽으로 넘겨 주기만 한다.
 '포털에 카드가 뜬다', '누르면 그 주소로 간다', '하위 경로·쿼리가 그대로 붙는다',
 '로그인 전에는 넘겨 주지 않는다' 를 고정한다.
 """
@@ -24,7 +24,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from server.main import app  # noqa: E402
 
 FAILURES: list[str] = []
-SITE = "http://virtual-stock.kro.kr"
+SITE = "https://virtual-stock.kacarong.kr"
 
 
 def check(label: str, got, want) -> None:

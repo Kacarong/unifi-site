@@ -1,7 +1,7 @@
-"""가상 주식 모의투자 — virtual-stock.kro.kr 로 보내 주는 바로가기 앱.
+"""가상 주식 모의투자 — virtual-stock.kacarong.kr 로 보내 주는 바로가기 앱.
 
 사이트 자체는 여기서 돌리지 않는다. 원래 서버(virtual-stock-site-bot 컨테이너,
-http://virtual-stock.kro.kr/)를 그대로 쓰고, 포털 카드나 /apps/vstock/ 주소로
+https://virtual-stock.kacarong.kr/)를 그대로 쓰고, 포털 카드나 /apps/vstock/ 주소로
 들어오면 그쪽으로 넘겨 준다. 그래서 가상 주식 사이트를 고치거나 다시 배포해도
 이 레포는 손댈 필요가 없다.
 
@@ -13,7 +13,7 @@ import os
 
 from server.registry import AppSpec
 
-TARGET = (os.environ.get("VSTOCK_URL") or "http://virtual-stock.kro.kr").rstrip("/")
+TARGET = (os.environ.get("VSTOCK_URL") or "https://virtual-stock.kacarong.kr").rstrip("/")
 
 
 def _mount(app):
@@ -38,7 +38,7 @@ SPEC = AppSpec(
     icon="📈",
     description=(
         "가상 돈으로 국내·해외 주식과 코인을 사고팔아 보는 모의투자 사이트입니다. "
-        "누르면 virtual-stock.kro.kr 로 이동하며, 사이트는 그쪽 서버에서 그대로 돌아갑니다."
+        "누르면 virtual-stock.kacarong.kr 로 이동하며, 사이트는 그쪽 서버에서 그대로 돌아갑니다."
     ),
     tags=["주식", "모의투자", "바로가기"],
     mount=_mount,
